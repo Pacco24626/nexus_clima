@@ -1,0 +1,110 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Nuova zona climatica",
+        "description": "Il minimo per partire. Potenze, prezzi e tempi si regolano poi dalle opzioni.",
+        "data": {
+          "name": "Nome della zona",
+          "climates": "Climatizzatori della zona",
+          "coupled": "Climatizzatori accoppiati (stesso volume)",
+          "grid_sensor": "Sensore di scambio con la rete",
+          "grid_positive_is_import": "Valore positivo = prelievo dalla rete",
+          "temp_sensor": "Sonda di temperatura della zona",
+          "outdoor_sensor": "Sonda di temperatura esterna",
+          "power_sensor": "Contatore dedicato ai climatizzatori"
+        },
+        "data_description": {
+          "coupled": "Macchine di altre zone che condividono l'aria con questa, per esempio con le porte aperte. Servono a non farle lavorare l'una contro l'altra.",
+          "temp_sensor": "Se non la indichi viene usata quella riportata dal climatizzatore.",
+          "power_sensor": "Se manca, la potenza viene stimata dai valori dichiarati nelle opzioni."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Esiste gia' una zona con questo nome."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Configurazione della zona",
+        "menu_options": {
+          "zona": "Climatizzatori e sensori",
+          "range": "Temperature e finestre",
+          "regolazione": "Regolazione e prezzi"
+        }
+      },
+      "zona": {
+        "title": "Climatizzatori e sensori",
+        "data": {
+          "climates": "Climatizzatori della zona",
+          "coupled": "Climatizzatori accoppiati (stesso volume)",
+          "grid_sensor": "Sensore di scambio con la rete",
+          "grid_positive_is_import": "Valore positivo = prelievo dalla rete",
+          "temp_sensor": "Sonda di temperatura della zona",
+          "outdoor_sensor": "Sonda di temperatura esterna",
+          "power_sensor": "Contatore dedicato ai climatizzatori"
+        }
+      },
+      "range": {
+        "title": "Temperature e finestre",
+        "description": "Nella finestra di carica il controllo puo' scendere fino al minimo. In quella di comfort si ferma al minimo di comfort. Fuori da entrambe non tocca nulla.",
+        "data": {
+          "temp_min": "Minimo in carica",
+          "temp_comfort_min": "Minimo in comfort",
+          "temp_max": "Massimo",
+          "charge_from": "Carica dalle",
+          "charge_to": "Carica fino alle",
+          "comfort_from": "Comfort dalle",
+          "comfort_to": "Comfort fino alle"
+        },
+        "data_description": {
+          "temp_min": "Quanto in basso puo' spingere quando c'e' surplus e la zona non e' occupata.",
+          "charge_from": "Lascia vuote le due ore di carica se la zona non va preraffrescata."
+        }
+      },
+      "regolazione": {
+        "title": "Regolazione e prezzi",
+        "description": "Le due potenze mappano il surplus sul setpoint: servono i watt assorbiti agli estremi del range, non serve che siano esatti.",
+        "data": {
+          "power_at_temp_min": "Potenza al minimo",
+          "power_at_temp_max": "Potenza al massimo",
+          "min_dwell": "Permanenza minima",
+          "max_step": "Passo massimo",
+          "interval": "Intervallo di valutazione",
+          "use_fan": "Usa la ventilazione come regolazione veloce",
+          "fan_normal": "Ventilazione a riposo",
+          "fan_boost": "Ventilazione in spinta",
+          "manual_hold": "Pausa dopo un comando manuale",
+          "buy_price": "Prezzo di acquisto",
+          "sell_price": "Prezzo di cessione"
+        },
+        "data_description": {
+          "min_dwell": "Sotto la mezz'ora si insegue il rumore della rete invece della temperatura della stanza.",
+          "fan_boost": "Il nome esatto della modalita', come la espone il climatizzatore. Lascia vuoto per non spingere la ventilazione.",
+          "manual_hold": "Zero significa fino alla mezzanotte successiva."
+        }
+      }
+    },
+    "error": {
+      "range_incoerente": "Deve valere: minimo in carica ≤ minimo in comfort ≤ massimo.",
+      "finestra_incompleta": "La finestra di carica vuole entrambe le ore, oppure nessuna.",
+      "potenze_incoerenti": "La potenza al minimo deve essere maggiore di quella al massimo."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state": { "name": "Stato" },
+      "floor": { "name": "Pavimento raggiungibile" },
+      "drift": { "name": "Deriva" },
+      "report": { "name": "Energia della zona" }
+    },
+    "switch": {
+      "enabled": { "name": "Abilitato" }
+    },
+    "button": {
+      "resume": { "name": "Riprendi il controllo" }
+    }
+  }
+}

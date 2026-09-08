@@ -1,0 +1,17 @@
+{
+  "domain": "nexus_clima",
+  "name": "Nexus Clima",
+  "codeowners": [
+    "@Pacco24626"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "climate"
+  ],
+  "documentation": "https://github.com/Pacco24626/nexus_clima",
+  "integration_type": "hub",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/Pacco24626/nexus_clima/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

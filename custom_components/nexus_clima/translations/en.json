@@ -1,0 +1,110 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "New climate zone",
+        "description": "Just enough to get going. Powers, prices and timings are set later from the options.",
+        "data": {
+          "name": "Zone name",
+          "climates": "Air conditioners in this zone",
+          "coupled": "Coupled air conditioners (shared volume)",
+          "grid_sensor": "Grid exchange sensor",
+          "grid_positive_is_import": "Positive value means importing",
+          "temp_sensor": "Zone temperature sensor",
+          "outdoor_sensor": "Outdoor temperature sensor",
+          "power_sensor": "Dedicated meter for the air conditioners"
+        },
+        "data_description": {
+          "coupled": "Units in other zones that share air with this one, for instance through an open door. Declaring them stops the zones fighting each other.",
+          "temp_sensor": "If left empty, the temperature reported by the air conditioner is used.",
+          "power_sensor": "Without it, power is estimated from the values declared in the options."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "A zone with this name already exists."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zone configuration",
+        "menu_options": {
+          "zona": "Air conditioners and sensors",
+          "range": "Temperatures and windows",
+          "regolazione": "Control and prices"
+        }
+      },
+      "zona": {
+        "title": "Air conditioners and sensors",
+        "data": {
+          "climates": "Air conditioners in this zone",
+          "coupled": "Coupled air conditioners (shared volume)",
+          "grid_sensor": "Grid exchange sensor",
+          "grid_positive_is_import": "Positive value means importing",
+          "temp_sensor": "Zone temperature sensor",
+          "outdoor_sensor": "Outdoor temperature sensor",
+          "power_sensor": "Dedicated meter for the air conditioners"
+        }
+      },
+      "range": {
+        "title": "Temperatures and windows",
+        "description": "Inside the charge window the control may go down to the minimum. Inside the comfort window it stops at the comfort minimum. Outside both it leaves everything alone.",
+        "data": {
+          "temp_min": "Minimum while charging",
+          "temp_comfort_min": "Minimum during comfort",
+          "temp_max": "Maximum",
+          "charge_from": "Charge from",
+          "charge_to": "Charge until",
+          "comfort_from": "Comfort from",
+          "comfort_to": "Comfort until"
+        },
+        "data_description": {
+          "temp_min": "How far down it may push when there is surplus and the zone is empty.",
+          "charge_from": "Leave both charge times empty if this zone should not be pre-cooled."
+        }
+      },
+      "regolazione": {
+        "title": "Control and prices",
+        "description": "The two powers map surplus onto the setpoint: the watts drawn at each end of the range. They do not need to be exact.",
+        "data": {
+          "power_at_temp_min": "Power at the minimum",
+          "power_at_temp_max": "Power at the maximum",
+          "min_dwell": "Minimum dwell",
+          "max_step": "Largest step",
+          "interval": "Evaluation interval",
+          "use_fan": "Use fan speed as the fast control",
+          "fan_normal": "Fan mode at rest",
+          "fan_boost": "Fan mode when pushing",
+          "manual_hold": "Pause after a manual change",
+          "buy_price": "Import price",
+          "sell_price": "Export price"
+        },
+        "data_description": {
+          "min_dwell": "Below half an hour you chase noise on the grid meter rather than the temperature of the room.",
+          "fan_boost": "The exact mode name as the unit exposes it. Leave empty to never push the fan.",
+          "manual_hold": "Zero means until the following midnight."
+        }
+      }
+    },
+    "error": {
+      "range_incoerente": "It must hold that: charge minimum ≤ comfort minimum ≤ maximum.",
+      "finestra_incompleta": "The charge window needs both times, or neither.",
+      "potenze_incoerenti": "Power at the minimum must be greater than power at the maximum."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state": { "name": "State" },
+      "floor": { "name": "Reachable floor" },
+      "drift": { "name": "Drift" },
+      "report": { "name": "Zone energy" }
+    },
+    "switch": {
+      "enabled": { "name": "Enabled" }
+    },
+    "button": {
+      "resume": { "name": "Resume control" }
+    }
+  }
+}
