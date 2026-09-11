@@ -12,6 +12,7 @@ davvero ai climatizzatori.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 import types
@@ -301,6 +302,33 @@ async def scenari():
     await minuti(hass, c, 12.5)
     v("e alla cessione torna al comfort vero, 22 e ventola 3",
       comandi(hass) == COMFORT, comandi(hass))
+
+    # --- 16. il sensore di stato non si riscrive a ogni campione -------------------
+    # Home Assistant scrive una riga nel database a ogni cambio di stato O di
+    # attributi. Quello che il sensore mostra deve quindi cambiare solo quando
+    # cambia la situazione, non quando la rete oscilla di qualche watt.
+    def istantanea(c):
+        return json.dumps([c.stato, c.motivo, c.soglie.dettagli()], sort_keys=True, default=str)
+
+    hass, c = await impianto()
+    viste, valori = set(), set()
+    for i in range(120):  # un'ora, un campione ogni 30 s, sempre sotto la soglia
+        valore = 100 + (i * 37) % 180
+        hass.imposta(RETE, str(valore))
+        valori.add(valore)
+        await minuti(hass, c, 0.5)
+        viste.add(istantanea(c))
+    v("controllo: in quell'ora la rete e' cambiata di continuo", len(valori) > 50, len(valori))
+    v("un'ora di comfort con la rete che oscilla: lo stato non cambia mai",
+      len(viste) == 1, sorted(viste))
+
+    viste = set()
+    for i in range(40):  # 20 minuti di prelievo, anche lui mai uguale
+        hass.imposta(RETE, str(400 + (i * 53) % 300))
+        await minuti(hass, c, 0.5)
+        viste.add(istantanea(c))
+    v("20 min di prelievo fino all'eco: 3 stati (attesa, eco, attesa del ritorno)",
+      len(viste) == 3, sorted(viste))
 
 
 def prove_pure():

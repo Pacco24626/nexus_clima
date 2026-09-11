@@ -496,8 +496,8 @@ class ClimaController:
             return decisione
 
         if self._manuale_fino is not None and adesso < self._manuale_fino:
-            resta = int((self._manuale_fino - adesso).total_seconds() // 60)
-            return Decisione(STATO_MANUALE, f"comando manuale, riprende fra {resta} min")
+            alle = dt_util.as_local(self._manuale_fino).strftime("%H:%M")
+            return Decisione(STATO_MANUALE, f"comando manuale, riprende alle {alle}")
 
         if not self.climi_accesi:
             return Decisione(STATO_NON_PRONTO, "nessun clima acceso in questa zona")
@@ -533,7 +533,8 @@ class ClimaController:
             frazione = max(0.0, min(1.0, frazione))
             obiettivo = self.t_max - frazione * corsa
 
-        motivo = f"surplus {surplus:.0f} W in finestra {finestra}"
+        # Senza i watt del momento: il surplus e' negli attributi, arrotondato.
+        motivo = f"modulazione sul surplus, finestra di {finestra}"
 
         # Passo 3: il cancello di utilita' termica.
         if (
@@ -552,7 +553,7 @@ class ClimaController:
             and abs(self.deriva) < DERIVA_DEBOLE
             and obiettivo < temperatura - MARGINE_SOTTO
         ):
-            motivo = f"deriva ferma a {self.deriva:+.2f} °C/h: la zona non assorbe di piu'"
+            motivo = "deriva ferma: la zona non assorbe di piu'"
 
         # Passo 5: non fermare mai il compressore, e rispettare gli accoppiamenti.
         obiettivo = max(obiettivo, temperatura - MARGINE_SOTTO)
@@ -572,10 +573,12 @@ class ClimaController:
                 obiettivo = attuale
             else:
                 if not self._permanenza_scaduta(adesso):
-                    resta = self._minuti_alla_permanenza(adesso)
+                    alle = dt_util.as_local(
+                        self._ultimo_cambio + timedelta(minutes=self.permanenza)
+                    ).strftime("%H:%M")
                     return Decisione(
                         finestra,
-                        f"{motivo}; fermo per permanenza minima ({resta} min)",
+                        f"{motivo}; fermo per permanenza minima fino alle {alle}",
                         setpoint=attuale,
                         ventola=self._ventola_per(surplus),
                     )
@@ -625,12 +628,6 @@ class ClimaController:
         if self._ultimo_cambio is None:
             return True
         return adesso - self._ultimo_cambio >= timedelta(minutes=self.permanenza)
-
-    def _minuti_alla_permanenza(self, adesso: datetime) -> int:
-        if self._ultimo_cambio is None:
-            return 0
-        resta = timedelta(minutes=self.permanenza) - (adesso - self._ultimo_cambio)
-        return max(0, int(resta.total_seconds() // 60))
 
     def _ventola_per(self, surplus: float) -> str | None:
         """La regolazione veloce: piu' surplus, piu' portata.

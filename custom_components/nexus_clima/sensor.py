@@ -69,20 +69,22 @@ class StatoSensor(ClimaEntity, SensorEntity):
                 "temperatura": c.temperatura,
                 "climi_accesi": c.climi_accesi,
                 "in_pausa_per_apertura": c.aperture.pausati() if c.aperture is not None else [],
-                "minuti_per_stato": {k: round(v) for k, v in c.minuti_stato.items()},
             }
+        # Qui come a soglie: niente che cambi a ogni valutazione, altrimenti lo
+        # stato si riscrive nel database a ogni ciclo. Le misure sono
+        # arrotondate, i minuti per stato stanno nel rendiconto.
+        esterna = c.temperatura_esterna
         return {
             "motivo": c.motivo,
             "modalita": "continua",
             "setpoint_obiettivo": c.setpoint_obiettivo,
             "temperatura": c.temperatura,
-            "temperatura_esterna": c.temperatura_esterna,
-            "surplus_w": None if c.surplus is None else round(c.surplus),
-            "potenza_stimata_w": round(c.potenza_stimata()),
+            "temperatura_esterna": None if esterna is None else round(esterna * 2) / 2,
+            "surplus_w": None if c.surplus is None else int(round(c.surplus, -2)),
+            "potenza_stimata_w": int(round(c.potenza_stimata() / 50) * 50),
             "ventilazione": c.ventola_corrente,
             "climi_accesi": c.climi_accesi,
             "in_pausa_per_apertura": c.aperture.pausati() if c.aperture is not None else [],
-            "minuti_per_stato": {k: round(v) for k, v in c.minuti_stato.items()},
         }
 
 
@@ -177,4 +179,7 @@ class RendicontoSensor(ClimaEntity, SensorEntity):
             "acquisto_evitato_eur": round(c.energia_surplus * c.prezzo_acquisto, 2),
             "differenza_eur": round(c.valore_differenza, 2),
             "misurata": c.sensore_potenza is not None,
+            # Qui e non nello stato: il rendiconto cambia gia' a ogni ciclo
+            # con il clima acceso, e i minuti non aggiungono scritture.
+            "minuti_per_stato": {k: round(v) for k, v in c.minuti_stato.items()},
         }

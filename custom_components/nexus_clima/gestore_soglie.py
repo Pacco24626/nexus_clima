@@ -60,7 +60,6 @@ from .soglie import (
     come_lasciato,
     comandi_comfort,
     comandi_eco,
-    minuti_mancanti,
     soglia_ritorno,
     trascorso,
 )
@@ -103,6 +102,7 @@ class GestoreSoglie:
         self.prelievo_da: datetime | None = None
         self.cessione_da: datetime | None = None
         self.ultimo_scambio: float | None = None  # positivo = prelievo
+        self.prossimo: str | None = None  # "HH:MM" del prossimo cambio, se in vista
 
         # Da quando ciascun clima e' com'e' per scelta dell'utente: acceso o
         # reimpostato. L'eco non arriva prima di un tempo di prelievo intero.
@@ -262,20 +262,21 @@ class GestoreSoglie:
         if scambio is None:
             return STATO_NON_PRONTO, "sensore di rete non disponibile"
 
-        ora = f"prelevi {scambio:.0f} W" if scambio > 0 else f"cedi {-scambio:.0f} W"
+        # Il motivo non porta mai i watt del momento ne' un conto alla rovescia:
+        # cambierebbero a ogni campione, e con loro il sensore di stato, che
+        # finirebbe riscritto nel database ogni 30 secondi. Porta invece
+        # l'orario del prossimo cambio, che resta fermo finche' la situazione
+        # non cambia davvero.
+        self.prossimo = None
 
         # 1. Chi e' in eco torna al comfort, se la cessione basta da abbastanza.
         in_eco = self.in_eco()
         if in_eco and self.cessione_da is not None:
-            inizio = self.cessione_da
-            ultimo = self._condiviso.get("ultimo_ritorno")
-            if ultimo is not None and ultimo > inizio:
-                inizio = ultimo
-            if trascorso(inizio, adesso, self.tempo_cessione):
+            if trascorso(self._inizio_ritorno(), adesso, self.tempo_cessione):
                 await self._async_torna_comfort(in_eco, adesso)
                 self._condiviso["ultimo_ritorno"] = adesso
                 self.cessione_da = None
-                return STATO_COMFORT, f"{ora} da {self.tempo_cessione:.0f} min: comfort ripristinato"
+                return STATO_COMFORT, f"comfort ripristinato alle {self._ora(adesso)}"
 
         # 2. Chi e' in comfort va in eco, se il prelievo dura da abbastanza.
         candidati = []
@@ -287,7 +288,7 @@ class GestoreSoglie:
                 candidati.append(clima)
 
         pronti: list[str] = []
-        attese: list[int] = []
+        attese: list[datetime] = []
         if self.prelievo_da is not None:
             for clima in candidati:
                 inizio = self.prelievo_da
@@ -297,22 +298,23 @@ class GestoreSoglie:
                 if trascorso(inizio, adesso, self.tempo_prelievo):
                     pronti.append(clima)
                 else:
-                    attese.append(minuti_mancanti(inizio, adesso, self.tempo_prelievo))
+                    attese.append(inizio)
         if pronti:
             await self._async_metti_in_eco(pronti, adesso)
             return STATO_ECO, (
-                f"prelievo oltre {self.soglia_prelievo:.0f} W da {self.tempo_prelievo:.0f} min: eco"
+                f"eco dalle {self._ora(adesso)}: prelievo oltre {self.soglia_prelievo:.0f} W "
+                f"per {self.tempo_prelievo:.0f} min"
             )
 
         # 3. Nessuna azione: si dice perche'.
-        if self.in_eco():
-            serve = self.soglia_ritorno()
+        in_eco = self.in_eco()
+        if in_eco:
+            dal = self._ora(min(self.eco[clima].dal for clima in in_eco))
             if self.cessione_da is not None:
-                inizio = max(self.cessione_da, self._condiviso.get("ultimo_ritorno") or self.cessione_da)
-                resta = minuti_mancanti(inizio, adesso, self.tempo_cessione)
-                return STATO_ECO, f"{ora}, ne servono {serve:.0f}: comfort fra {resta} min"
+                self.prossimo = self._alle(self._inizio_ritorno(), self.tempo_cessione)
+                return STATO_ECO, f"eco dalle {dal}: la cessione basta, comfort alle {self.prossimo} se continua"
             return STATO_ECO, (
-                f"{ora}; per tornare al comfort bisogna cedere oltre {serve:.0f} W "
+                f"eco dalle {dal}: torna al comfort cedendo oltre {self.soglia_ritorno():.0f} W "
                 f"({self.soglia_cessione:.0f} + {self.consumo_in_piu:.0f} per clima) "
                 f"per {self.tempo_cessione:.0f} min"
             )
@@ -321,8 +323,29 @@ class GestoreSoglie:
                 f"nessun clima acceso in raffrescamento sotto i {self.eco_temp:.0f} °C: niente da fare"
             )
         if attese:
-            return STATO_COMFORT, f"{ora}: eco fra {min(attese)} min"
-        return STATO_COMFORT, f"{ora}: l'eco scatta oltre {self.soglia_prelievo:.0f} W di prelievo"
+            self.prossimo = self._alle(min(attese), self.tempo_prelievo)
+            return STATO_COMFORT, (
+                f"prelievo oltre {self.soglia_prelievo:.0f} W: eco alle {self.prossimo} se continua"
+            )
+        return STATO_COMFORT, (
+            f"comfort: l'eco scatta con un prelievo oltre {self.soglia_prelievo:.0f} W "
+            f"per {self.tempo_prelievo:.0f} min"
+        )
+
+    def _inizio_ritorno(self) -> datetime | None:
+        """Da quando conta la cessione: non prima dell'ultimo ritorno di un'altra zona."""
+        inizio = self.cessione_da
+        ultimo = self._condiviso.get("ultimo_ritorno")
+        if inizio is not None and ultimo is not None and ultimo > inizio:
+            return ultimo
+        return inizio
+
+    @staticmethod
+    def _ora(momento: datetime) -> str:
+        return dt_util.as_local(momento).strftime("%H:%M")
+
+    def _alle(self, inizio: datetime, minuti: float) -> str:
+        return self._ora(inizio + timedelta(minutes=minuti))
 
     # -------------------------------------------------------------------------
     # Azioni
@@ -403,14 +426,20 @@ class GestoreSoglie:
         )
 
     def dettagli(self) -> dict[str, Any]:
-        """Per gli attributi del sensore di stato. Sempre strutture nuove."""
+        """Per gli attributi del sensore di stato. Sempre strutture nuove.
+
+        Solo valori che cambiano quando cambia la situazione. Lo scambio con
+        la rete del momento non c'e': cambierebbe a ogni campione, e ha gia'
+        il suo sensore.
+        """
         return {
             "modalita": "soglie",
             "in_eco": list(self.eco),
             "comfort_da_ripristinare": {
                 clima: eco.comfort_temp for clima, eco in self.eco.items()
             },
-            "scambio_w": None if self.ultimo_scambio is None else round(self.ultimo_scambio),
+            "soglia_prelievo_w": round(self.soglia_prelievo),
             "soglia_ritorno_w": round(self.soglia_ritorno()),
+            "prossimo_cambio": self.prossimo,
             "fascia": f"{self.attiva_da[:5]}–{self.attiva_a[:5]}",
         }

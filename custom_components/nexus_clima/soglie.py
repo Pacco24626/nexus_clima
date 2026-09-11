@@ -124,10 +124,3 @@ def soglia_ritorno(soglia_cessione: float, consumo_in_piu: float, climi_in_eco: 
 
 def trascorso(da: datetime | None, adesso: datetime, minuti: float) -> bool:
     return da is not None and adesso - da >= timedelta(minutes=minuti)
-
-
-def minuti_mancanti(da: datetime | None, adesso: datetime, minuti: float) -> int:
-    if da is None:
-        return int(minuti)
-    resta = timedelta(minutes=minuti) - (adesso - da)
-    return max(0, int(-(-resta.total_seconds() // 60)))

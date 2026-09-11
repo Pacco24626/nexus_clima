@@ -217,7 +217,7 @@ circuito dei climi e' l'investimento che rende attendibile tutto il resto.
 
 | Entita' | A che serve |
 |---|---|
-| `sensor` Stato | Cosa sta facendo e perche' (`motivo`); a soglie: clima in eco, comfort da rimettere, scambio con la rete, soglia di ritorno |
+| `sensor` Stato | Cosa sta facendo e perche' (`motivo`, con l'orario del prossimo cambio); a soglie: clima in eco, comfort da rimettere, soglie. Cambia solo quando cambia la situazione, non a ogni campione della rete |
 | `sensor` Deriva | Gradi all'ora, con la deriva passiva negli attributi ¹ |
 | `sensor` Energia della zona | kWh di oggi, quota da surplus e valore in euro ¹ |
 | `switch` Modulazione solare | Spento, la modulazione si ferma; a soglie chi e' in eco torna al suo comfort ¹ |

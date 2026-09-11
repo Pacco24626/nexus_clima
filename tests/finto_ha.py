@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import os
 import sys
 import types
 from datetime import datetime, timedelta, timezone
@@ -201,16 +202,22 @@ _modulo(
     async_track_time_interval=lambda *a, **k: (lambda: None),
 )
 _modulo("homeassistant.helpers.storage", Store=Store)
-_modulo("homeassistant.util", dt=types.SimpleNamespace(now=OROLOGIO.now))
+_modulo("homeassistant.util", dt=types.SimpleNamespace(now=OROLOGIO.now, as_local=lambda d: d))
 _cv = _modulo(
     "homeassistant.helpers.config_validation",
     config_entry_only_config_schema=lambda dominio: None,
 )
 _helpers.config_validation = _cv
 
+# NEXUS_CLIMA_SRC permette di provare un'altra versione del codice con le
+# stesse prove: serve a verificare che una prova nuova fallisca davvero sul
+# codice che doveva correggere.
 sys.path.insert(
     0,
-    r"C:\Users\giova\Desktop\Progetto domotica\Home Assistant\nexus_clima\custom_components",
+    os.environ.get(
+        "NEXUS_CLIMA_SRC",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "custom_components"),
+    ),
 )
 
 
