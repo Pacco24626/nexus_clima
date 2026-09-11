@@ -22,7 +22,9 @@ async def async_setup_entry(
 ) -> None:
     controller: ClimaController = hass.data[DOMAIN][entry.entry_id]
     entita: list[Entity] = []
-    if controller.modulazione:
+    # Solo la modulazione continua ha una pausa dopo un comando manuale: a
+    # soglie il setpoint dell'utente e' il comfort, non un'interruzione.
+    if controller.modulazione and controller.soglie is None:
         entita.append(RiprendiButton(controller))
     if controller.aperture is not None:
         entita.extend(

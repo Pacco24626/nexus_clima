@@ -1,20 +1,66 @@
 # Nexus Clima
 
-Modula i climatizzatori sul surplus fotovoltaico, tenendo il compressore
-sempre acceso al carico che il sole riesce a pagare.
+Due cose, indipendenti, per ogni zona della casa:
 
-E li ferma quando si apre una porta o una finestra del loro ambiente, per
-rimetterli com'erano alla chiusura.
+- **Modulazione solare**: i climatizzatori che accendi tu passano in *eco*
+  quando si preleva dalla rete, e tornano al *comfort* che avevi scelto quando
+  si cede. Non vengono mai accesi ne' spenti.
+- **Porte e finestre**: il clima si ferma quando si apre un'apertura del suo
+  ambiente, e torna com'era alla chiusura.
+
+Senza sensore di rete la zona gestisce solo porte e finestre; senza sensori
+di apertura, solo la modulazione. La configurazione e' in sequenza:
+climatizzatori e sensori, poi porte e finestre, poi — se c'e' il sensore di
+rete — la modulazione solare. Tutto si cambia poi da **Configura** sulla zona.
 
 Una voce di configurazione per zona: zone diverse hanno profili d'uso opposti
 — una camera si vive di notte, quando il fotovoltaico non produce; un salotto
 di giorno — e meritano politiche diverse, non un setpoint comune.
 
-Le due funzioni sono indipendenti. Senza sensore di rete la zona non modula
-sul fotovoltaico e gestisce soltanto porte e finestre: e' il caso di chi non
-ha un impianto.
+## Modulazione a soglie
 
-## Perche' non basta accendere e spegnere
+E' la predefinita. Il comfort non lo decide l'integrazione: e' il setpoint e
+la ventola che hai impostato sul clima.
+
+| Opzione | Predefinito |
+|---|---|
+| Temperatura eco | 25 °C |
+| Ventilazione eco | Auto (vuota: non si tocca) |
+| Va in eco con un prelievo oltre | 300 W per 8 min |
+| Torna al comfort con una cessione oltre | 500 W per 12 min |
+| Consumo in piu' di ogni clima al comfort | 600 W |
+| Attiva | 10:00 – 19:00 |
+
+- Si tocca solo un clima **acceso in raffrescamento con il setpoint piu'
+  basso dell'eco**. Uno a 25 o sopra, spento, o in riscaldamento resta com'e'.
+- Il ritorno al comfort rimette **esattamente** setpoint e ventola di prima.
+- Il «per X minuti» e' quello delle automazioni: basta un momento sotto la
+  soglia perche' il conteggio riparta.
+- Un clima appena acceso, o reimpostato da te, ha davanti un tempo di prelievo
+  intero prima dell'eco, anche se la casa preleva gia' da un'ora.
+- Se cambi setpoint, ventola o modalita' mentre e' in eco, da quel momento il
+  comfort e' il tuo nuovo valore.
+- Fuori dalla fascia non si tocca niente; a fine fascia chi e' in eco resta
+  com'e'.
+- Piu' zone tornano al comfort **una alla volta**: il surplus che ne basta per
+  una, se tornassero tutte insieme, le rimanderebbe tutte in eco.
+
+**Il consumo in piu' al comfort** e' l'unica differenza rispetto alla
+classica automazione comfort/eco, e si puo' mettere a zero. Tornando al
+comfort il clima consuma di piu'. Se il margine fra le due soglie (300 W di
+prelievo, 500 di cessione: 800 W) e' piu' stretto di quel consumo — su un
+Daikin da camera l'abbiamo misurato fra 700 e 950 W — il ritorno al comfort fa
+scattare da solo il ritorno in eco, e il clima fa il ping-pong, con il
+compressore che si ferma a ogni passaggio. Con 600 W la cessione per tornare
+al comfort diventa 1100 W.
+
+## Modulazione continua
+
+L'alternativa, da scegliere in **Configura → Modulazione solare**: il setpoint
+lo decide il controller, fra un minimo e un massimo, in proporzione al
+surplus.
+
+### Perche' non basta accendere e spegnere
 
 L'automazione che tutti scrivono commuta il setpoint fra un valore "comfort"
 quando c'e' sole e uno "eco" quando si preleva dalla rete. Sembra ragionevole
@@ -31,7 +77,7 @@ volta, non lo porta mai sotto la temperatura attuale, e per la regolazione
 veloce usa la **ventilazione**, che si puo' muovere liberamente senza mai
 rischiare di fermare la macchina.
 
-## Come decide
+### Come decide
 
 Sei passi, rieseguiti a ogni valutazione. Lo stato pubblicato porta sempre con
 se' il **motivo**, che e' l'unica spiegazione di cui c'e' bisogno quando il
@@ -70,7 +116,7 @@ grado per passo, e mezz'ora di permanenza: con una deriva dell'ordine di 0,25
 gradi l'ora, cambiare piu' spesso significa inseguire il rumore della rete
 invece della temperatura della stanza.
 
-## Finestre di carica e di comfort
+### Finestre di carica e di comfort
 
 Ogni zona dichiara due finestre.
 
@@ -86,7 +132,7 @@ Per una zona notte in una casa con fotovoltaico, la configurazione tipica e':
 | Zona notte | 10:00 – 17:00 | 22:00 – 07:00 | 22 – 26 °C |
 | Zona giorno | — | 10:00 – 22:00 | 24 – 26 °C |
 
-## Il comando resta all'utente
+### Il comando resta all'utente
 
 Un setpoint cambiato a mano e' un ordine, non un disturbo. Il controller se ne
 accorge, entra in stato `manuale` e smette di comandare per il tempo
@@ -171,18 +217,18 @@ circuito dei climi e' l'investimento che rende attendibile tutto il resto.
 
 | Entita' | A che serve |
 |---|---|
-| `sensor` Stato | Cosa sta facendo e perche'; negli attributi surplus, setpoint obiettivo, clima in pausa, minuti per stato |
-| `sensor` Pavimento raggiungibile | Il minimo reale della zona, appreso ¹ |
+| `sensor` Stato | Cosa sta facendo e perche' (`motivo`); a soglie: clima in eco, comfort da rimettere, scambio con la rete, soglia di ritorno |
 | `sensor` Deriva | Gradi all'ora, con la deriva passiva negli attributi ¹ |
 | `sensor` Energia della zona | kWh di oggi, quota da surplus e valore in euro ¹ |
-| `switch` Modulazione solare | Sospende la modulazione senza spegnere i climatizzatori ¹ |
-| `button` Riprendi il controllo | Chiude in anticipo la pausa manuale ¹ |
+| `switch` Modulazione solare | Spento, la modulazione si ferma; a soglie chi e' in eco torna al suo comfort ¹ |
+| `sensor` Pavimento raggiungibile | Il minimo reale della zona, appreso ³ |
+| `button` Riprendi il controllo | Chiude in anticipo la pausa manuale ³ |
 | `switch` Pausa per aperture | Spento, porte e finestre non fermano piu' i clima ² |
 | `binary_sensor` Pausa *clima* | Acceso mentre quel clima e' fermo per un'apertura; negli attributi le aperture aperte, cosa verra' ripristinato e se ² |
 | `button` Non riaccendere *clima* | Durante la pausa: alla chiusura resta spento ² |
 
 ¹ solo con il sensore di rete. ² solo per i clima con almeno un sensore di
-apertura.
+apertura. ³ solo nella modulazione continua.
 
 In plancia, il pulsante si mostra solo quando serve con una card condizionale
 sul sensore della pausa:

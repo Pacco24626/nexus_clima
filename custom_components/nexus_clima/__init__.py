@@ -15,6 +15,7 @@ from homeassistant.helpers.storage import Store
 from .const import DOMAIN, PLATFORMS
 from .controller import ClimaController
 from .gestore_aperture import VERSIONE_STORAGE, chiave_storage
+from .gestore_soglie import chiave_storage as chiave_storage_soglie
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -41,8 +42,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Zona eliminata: via anche le pause per apertura che ricordava."""
+    """Zona eliminata: via anche le pause e i comfort che ricordava."""
     await Store(hass, VERSIONE_STORAGE, chiave_storage(entry.entry_id)).async_remove()
+    await Store(hass, VERSIONE_STORAGE, chiave_storage_soglie(entry.entry_id)).async_remove()
 
 
 async def _async_ricarica(hass: HomeAssistant, entry: ConfigEntry) -> None:

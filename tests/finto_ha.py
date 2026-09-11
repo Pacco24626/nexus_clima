@@ -264,12 +264,19 @@ class Hass:
         self.services = Servizi(self)
         self.loop = _Loop()
         self.is_running = True
+        self.data: dict = {}
+        self.compiti: list = []
         self._timer: list[list] = []  # [scadenza, numero, azione, attivo]
         self._numero = 0
         self._ascoltatori: dict[str, list] = {}
         # Cio' che ogni clima "ricorda" da spento: il setpoint che riprende.
         self.memoria_clima: dict[str, float] = {}
         _IMPIANTO["hass"] = self
+
+    def async_create_task(self, coroutine):
+        compito = asyncio.ensure_future(coroutine)
+        self.compiti.append(compito)
+        return compito
 
     # stati
     def imposta(self, entity_id: str, stato: str, **attributi) -> None:

@@ -38,6 +38,28 @@
           "resume_on_close": "Only a unit that was on, and that was stopped by this integration, is restored — with its previous mode, temperature and fan.",
           "resume_limit": "Zero means always restore. Useful when leaving with a window open: the unit stays off when you come back."
         }
+      },
+      "soglie": {
+        "title": "Solar modulation",
+        "description": "Thresholds: the units you switch on stay at the setpoint and fan you chose (comfort) and move to eco while importing from the grid. They are never switched on or off. Only a unit cooling with a setpoint below eco is touched.",
+        "data": {
+          "mode": "Mode",
+          "eco_temperature": "Eco temperature",
+          "eco_fan": "Eco fan mode",
+          "import_threshold": "Go to eco when importing more than",
+          "import_minutes": "for at least",
+          "export_threshold": "Back to comfort when exporting more than",
+          "export_minutes": "for at least",
+          "comfort_extra_power": "Extra consumption of each unit at comfort",
+          "active_from": "Active from",
+          "active_to": "until"
+        },
+        "data_description": {
+          "eco_fan": "The exact mode name, as the unit exposes it (for example Auto). Leave empty to leave the fan alone.",
+          "export_threshold": "Comfort comes back with exactly the setpoint and fan that were there.",
+          "comfort_extra_power": "Added to the export threshold: back at comfort the unit draws more, and without this margin it would trigger eco again by itself. Zero to disable.",
+          "active_to": "Outside this slot nothing is touched. At the end of the slot, units in eco stay as they are."
+        }
       }
     },
     "abort": {
@@ -54,8 +76,9 @@
         "menu_options": {
           "zona": "Air conditioners and sensors",
           "aperture": "Doors and windows",
-          "range": "Temperatures and windows",
-          "regolazione": "Control and prices"
+          "soglie": "Solar modulation",
+          "range": "Continuous modulation: temperatures and time slots",
+          "regolazione": "Continuous modulation: regulation and prices"
         }
       },
       "zona": {
@@ -129,6 +152,28 @@
           "resume_on_close": "Only a unit that was on, and that was stopped by this integration, is restored — with its previous mode, temperature and fan.",
           "resume_limit": "Zero means always restore. Useful when leaving with a window open: the unit stays off when you come back."
         }
+      },
+      "soglie": {
+        "title": "Solar modulation",
+        "description": "Thresholds: the units you switch on stay at the setpoint and fan you chose (comfort) and move to eco while importing from the grid. They are never switched on or off. Only a unit cooling with a setpoint below eco is touched.",
+        "data": {
+          "mode": "Mode",
+          "eco_temperature": "Eco temperature",
+          "eco_fan": "Eco fan mode",
+          "import_threshold": "Go to eco when importing more than",
+          "import_minutes": "for at least",
+          "export_threshold": "Back to comfort when exporting more than",
+          "export_minutes": "for at least",
+          "comfort_extra_power": "Extra consumption of each unit at comfort",
+          "active_from": "Active from",
+          "active_to": "until"
+        },
+        "data_description": {
+          "eco_fan": "The exact mode name, as the unit exposes it (for example Auto). Leave empty to leave the fan alone.",
+          "export_threshold": "Comfort comes back with exactly the setpoint and fan that were there.",
+          "comfort_extra_power": "Added to the export threshold: back at comfort the unit draws more, and without this margin it would trigger eco again by itself. Zero to disable.",
+          "active_to": "Outside this slot nothing is touched. At the end of the slot, units in eco stay as they are."
+        }
       }
     },
     "error": {
@@ -172,6 +217,12 @@
       "options": {
         "off": "Switch off",
         "fan_only": "Fan only"
+      }
+    },
+    "modalita": {
+      "options": {
+        "thresholds": "Thresholds (comfort / eco)",
+        "continuous": "Continuous"
       }
     }
   }

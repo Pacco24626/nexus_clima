@@ -59,6 +59,20 @@ CONF_PAUSA_MANUALE = "manual_hold"
 CONF_PREZZO_ACQUISTO = "buy_price"
 CONF_PREZZO_CESSIONE = "sell_price"
 
+# Modulazione solare: a soglie (comfort/eco) o continua.
+CONF_MODALITA = "mode"
+MODALITA_SOGLIE = "thresholds"
+MODALITA_CONTINUA = "continuous"
+CONF_ECO_TEMP = "eco_temperature"
+CONF_ECO_VENTOLA = "eco_fan"
+CONF_SOGLIA_PRELIEVO = "import_threshold"
+CONF_TEMPO_PRELIEVO = "import_minutes"
+CONF_SOGLIA_CESSIONE = "export_threshold"
+CONF_TEMPO_CESSIONE = "export_minutes"
+CONF_CONSUMO_IN_PIU = "comfort_extra_power"
+CONF_ATTIVA_DA = "active_from"
+CONF_ATTIVA_A = "active_to"
+
 # Porte e finestre. "Aperture" e non "finestre": in questa integrazione la
 # finestra e' gia' la fascia oraria di carica o di comfort.
 CONF_APERTURE = "openings"  # {climate: [binary_sensor, ...]}
@@ -93,6 +107,20 @@ DEFAULT_PAUSA_MANUALE = 180
 
 DEFAULT_PREZZO_ACQUISTO = 0.25
 DEFAULT_PREZZO_CESSIONE = 0.08
+
+# A soglie: i valori della classica automazione comfort/eco, piu' il consumo
+# che il clima aggiunge tornando al comfort (misurato l'11/09/2026 su un Daikin
+# da camera: 700-950 W fra 22 e 25 °C; 600 e' prudente).
+DEFAULT_MODALITA = MODALITA_SOGLIE
+DEFAULT_ECO_TEMP = 25.0
+DEFAULT_ECO_VENTOLA = "Auto"
+DEFAULT_SOGLIA_PRELIEVO = 300
+DEFAULT_TEMPO_PRELIEVO = 8
+DEFAULT_SOGLIA_CESSIONE = 500
+DEFAULT_TEMPO_CESSIONE = 12
+DEFAULT_CONSUMO_IN_PIU = 600
+DEFAULT_ATTIVA_DA = "10:00:00"
+DEFAULT_ATTIVA_A = "19:00:00"
 
 # Un minuto di apertura prima di fermare: chi passa da una porta non deve
 # spegnere il clima. Mezzo minuto di chiusura prima di riaccendere: una
@@ -146,6 +174,15 @@ ATTESA_ACCENSIONE = 10.0
 # qualche secondo il valore che ricordava lei.
 TOLLERANZA_RIPRISTINO = 60
 
+# A soglie: dopo un nostro comando, per quanto un cambio di setpoint o di
+# ventola va considerato nostro. Alcune integrazioni locali riportano lo stato
+# solo al polling successivo, anche un minuto dopo.
+TOLLERANZA_COMANDO = 150
+
+# A soglie si guarda la rete piu' spesso: i tempi sono di minuti, e un ciclo
+# di due minuti li allungherebbe fino a due minuti.
+INTERVALLO_SOGLIE = 30
+
 # --- Stati --------------------------------------------------------------------
 STATO_CARICA = "carica"
 STATO_COMFORT = "comfort"
@@ -154,6 +191,7 @@ STATO_FUORI = "fuori_finestra"
 STATO_DISABILITATO = "disabilitato"
 STATO_NON_PRONTO = "non_pronto"
 STATO_APERTURA = "apertura"
+STATO_ECO = "eco"
 STATO_SENZA_MODULAZIONE = "senza_modulazione"
 
 # --- Chiavi delle entita' -----------------------------------------------------

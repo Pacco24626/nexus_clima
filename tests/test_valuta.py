@@ -45,6 +45,7 @@ def costruisci(rete_w, temp, setpoint, stati=None, **extra):
         const.CONF_CARICA_A: "17:00:00",
         const.CONF_COMFORT_DA: "22:00:00",
         const.CONF_COMFORT_A: "07:00:00",
+        const.CONF_MODALITA: const.MODALITA_CONTINUA,
     }
     dati.update(extra)
     return ClimaController(hass, Entry(dati, title="Zona notte"))

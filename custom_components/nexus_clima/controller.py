@@ -71,6 +71,7 @@ from .const import (
     CONF_COMFORT_A,
     CONF_COMFORT_DA,
     CONF_INTERVALLO,
+    CONF_MODALITA,
     CONF_NOME,
     CONF_P_A_T_MAX,
     CONF_P_A_T_MIN,
@@ -93,6 +94,7 @@ from .const import (
     DEFAULT_COMFORT_A,
     DEFAULT_COMFORT_DA,
     DEFAULT_INTERVALLO,
+    DEFAULT_MODALITA,
     DEFAULT_P_A_T_MAX,
     DEFAULT_P_A_T_MIN,
     DEFAULT_PASSO,
@@ -106,10 +108,12 @@ from .const import (
     DEFAULT_VENTOLA_BASE,
     DERIVA_DEBOLE,
     FINESTRA_DERIVA,
+    INTERVALLO_SOGLIE,
     ISTERESI,
     MARGINE_PAVIMENTO,
     MARGINE_SOTTO,
     MINUTI_PLATEAU,
+    MODALITA_SOGLIE,
     PESO_APPRENDIMENTO,
     RITENTATIVI,
     SPAZIATURA,
@@ -124,6 +128,7 @@ from .const import (
     TOLLERANZA_RIPRISTINO,
 )
 from .gestore_aperture import GestoreAperture
+from .gestore_soglie import GestoreSoglie
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -237,6 +242,14 @@ class ClimaController:
                 notifica=self.notify, al_ripristino=self._al_ripristino,
             )
 
+        # La modulazione solare: a soglie (comfort/eco, il comfort lo sceglie
+        # l'utente) oppure continua (il setpoint lo sceglie il controller).
+        self.modalita: str = cfg.get(CONF_MODALITA) or DEFAULT_MODALITA
+        self.soglie: GestoreSoglie | None = None
+        if self.modulazione and self.modalita == MODALITA_SOGLIE:
+            self.soglie = GestoreSoglie(self, cfg)
+            self.intervallo = min(self.intervallo, INTERVALLO_SOGLIE)
+
     @property
     def modulazione(self) -> bool:
         """La modulazione sul fotovoltaico c'e' solo con il sensore di rete.
@@ -281,6 +294,8 @@ class ClimaController:
                 self._comandato[entity_id] = valore
         if self.aperture is not None:
             await self.aperture.async_avvia()
+        if self.soglie is not None:
+            await self.soglie.async_avvia()
         await self._async_ciclo(dt_util.now())
 
     async def async_shutdown(self) -> None:
@@ -289,6 +304,8 @@ class ClimaController:
         self._unsub.clear()
         if self.aperture is not None:
             self.aperture.async_ferma()
+        if self.soglie is not None:
+            self.soglie.async_ferma()
 
     @callback
     def _al_ripristino(self, entity_id: str, temperatura: float | None) -> None:
@@ -322,7 +339,11 @@ class ClimaController:
 
     @callback
     def set_abilitato(self, valore: bool) -> None:
+        cambiato = valore != self.abilitato
         self.abilitato = valore
+        if cambiato and not valore and self.soglie is not None:
+            # A soglie, spegnere la modulazione rimette il comfort dell'utente.
+            self.hass.async_create_task(self.soglie.async_disattiva())
         self.notify()
 
     @callback
@@ -471,19 +492,8 @@ class ClimaController:
         """
         adesso = adesso or dt_util.now()
 
-        pausati = self.aperture.pausati() if self.aperture is not None else []
-        if pausati and not self.climi_accesi:
-            nomi = ", ".join(self._nome_clima(e) for e in pausati)
-            return Decisione(STATO_APERTURA, f"in pausa per porta o finestra aperta: {nomi}")
-
-        if not self.modulazione:
-            return Decisione(
-                STATO_SENZA_MODULAZIONE,
-                "modulazione solare non configurata: si gestiscono solo le aperture",
-            )
-
-        if not self.abilitato:
-            return Decisione(STATO_DISABILITATO, "modulazione solare disattivata")
+        if (decisione := self._precondizioni(adesso)) is not None:
+            return decisione
 
         if self._manuale_fino is not None and adesso < self._manuale_fino:
             resta = int((self._manuale_fino - adesso).total_seconds() // 60)
@@ -575,6 +585,23 @@ class ClimaController:
         obiettivo = round(obiettivo)
         return Decisione(finestra, motivo, setpoint=float(obiettivo), ventola=self._ventola_per(surplus))
 
+    def _precondizioni(self, adesso: datetime) -> Decisione | None:
+        """Cio' che viene prima di qualunque modulazione, a soglie o continua."""
+        pausati = self.aperture.pausati() if self.aperture is not None else []
+        if pausati and not self.climi_accesi:
+            nomi = ", ".join(self._nome_clima(e) for e in pausati)
+            return Decisione(STATO_APERTURA, f"in pausa per porta o finestra aperta: {nomi}")
+
+        if not self.modulazione:
+            return Decisione(
+                STATO_SENZA_MODULAZIONE,
+                "modulazione solare non configurata: si gestiscono solo le aperture",
+            )
+
+        if not self.abilitato:
+            return Decisione(STATO_DISABILITATO, "modulazione solare disattivata")
+        return None
+
     def _nome_clima(self, entity_id: str) -> str:
         stato = self.hass.states.get(entity_id)
         if stato is not None and stato.attributes.get("friendly_name"):
@@ -626,6 +653,16 @@ class ClimaController:
         self._aggiorna_storia(adesso)
         self._aggiorna_apprendimento(adesso)
         self._aggiorna_contabilita(adesso)
+
+        if self.soglie is not None:
+            decisione = self._precondizioni(adesso)
+            if decisione is None:
+                self.stato, self.motivo = await self.soglie.async_valuta(adesso)
+            else:
+                self.stato, self.motivo = decisione.stato, decisione.motivo
+            self.setpoint_obiettivo = None
+            self.notify()
+            return
 
         decisione = self.valuta(adesso)
         self.stato = decisione.stato
@@ -716,8 +753,12 @@ class ClimaController:
     # Comando manuale
     # -------------------------------------------------------------------------
     async def _async_clima_cambiato(self, event: Event) -> None:
-        """Un setpoint che non abbiamo scritto noi e' un ordine dell'utente."""
-        if self._sto_comandando or not self.abilitato:
+        """Un setpoint che non abbiamo scritto noi e' un ordine dell'utente.
+
+        Solo nella modulazione continua: a soglie il setpoint dell'utente e' il
+        comfort, e se ne occupa gestore_soglie.py.
+        """
+        if self._sto_comandando or not self.abilitato or self.soglie is not None:
             return
 
         entity_id = event.data.get("entity_id")

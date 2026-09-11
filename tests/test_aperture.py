@@ -332,7 +332,10 @@ async def scenari():
       d.stato == const.STATO_SENZA_MODULAZIONE and d.setpoint is None, (d.stato, d.motivo))
 
     # --- 16. il ripristino non e' un comando manuale -----------------------------
-    hass, c = impianto(**{const.CONF_SENSORE_RETE: "sensor.rete"})
+    # Nella modulazione continua, l'unica che ha il comando manuale; per quella
+    # a soglie lo stesso caso e' in test_soglie.py (scenario 15).
+    hass, c = impianto(**{const.CONF_SENSORE_RETE: "sensor.rete",
+                          const.CONF_MODALITA: const.MODALITA_CONTINUA})
     hass.imposta("sensor.rete", "-500")
     await c.async_setup()
     await cedi()

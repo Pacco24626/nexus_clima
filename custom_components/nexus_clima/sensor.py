@@ -36,16 +36,13 @@ async def async_setup_entry(
 ) -> None:
     controller: ClimaController = hass.data[DOMAIN][entry.entry_id]
     entita: list[SensorEntity] = [StatoSensor(controller)]
-    # Senza sensore di rete la zona serve solo per le aperture: pavimento,
-    # deriva e rendiconto riguardano la modulazione e non avrebbero senso.
+    # Senza sensore di rete la zona serve solo per le aperture: deriva e
+    # rendiconto riguardano la modulazione e non avrebbero senso. Il pavimento
+    # e' un concetto della sola modulazione continua.
     if controller.modulazione:
-        entita.extend(
-            [
-                PavimentoSensor(controller),
-                DerivaSensor(controller),
-                RendicontoSensor(controller),
-            ]
-        )
+        entita.extend([DerivaSensor(controller), RendicontoSensor(controller)])
+        if controller.soglie is None:
+            entita.append(PavimentoSensor(controller))
     async_add_entities(entita)
 
 
@@ -65,8 +62,18 @@ class StatoSensor(ClimaEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         c = self.controller
+        if c.soglie is not None:
+            return {
+                "motivo": c.motivo,
+                **c.soglie.dettagli(),
+                "temperatura": c.temperatura,
+                "climi_accesi": c.climi_accesi,
+                "in_pausa_per_apertura": c.aperture.pausati() if c.aperture is not None else [],
+                "minuti_per_stato": {k: round(v) for k, v in c.minuti_stato.items()},
+            }
         return {
             "motivo": c.motivo,
+            "modalita": "continua",
             "setpoint_obiettivo": c.setpoint_obiettivo,
             "temperatura": c.temperatura,
             "temperatura_esterna": c.temperatura_esterna,

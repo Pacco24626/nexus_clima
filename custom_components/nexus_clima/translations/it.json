@@ -38,6 +38,28 @@
           "resume_on_close": "Si riaccende solo un clima che era acceso e che abbiamo fermato noi, con modalita', temperatura e ventola di prima.",
           "resume_limit": "Zero significa riaccendere sempre. Utile per chi esce lasciando la finestra aperta: al rientro il clima resta spento."
         }
+      },
+      "soglie": {
+        "title": "Modulazione solare",
+        "description": "A soglie: i clima che accendi tu restano al setpoint e alla ventola che hai scelto (il comfort) e passano in eco quando si preleva dalla rete. Non vengono mai accesi ne' spenti. Si tocca solo un clima in raffrescamento con il setpoint piu' basso dell'eco.",
+        "data": {
+          "mode": "Modalita'",
+          "eco_temperature": "Temperatura eco",
+          "eco_fan": "Ventilazione eco",
+          "import_threshold": "Va in eco con un prelievo oltre",
+          "import_minutes": "per almeno",
+          "export_threshold": "Torna al comfort con una cessione oltre",
+          "export_minutes": "per almeno",
+          "comfort_extra_power": "Consumo in piu' di ogni clima al comfort",
+          "active_from": "Attiva dalle",
+          "active_to": "fino alle"
+        },
+        "data_description": {
+          "eco_fan": "Il nome esatto della modalita', come la espone il climatizzatore (per esempio Auto). Lascia vuoto per non toccare la ventilazione.",
+          "export_threshold": "Il comfort torna rimettendo esattamente setpoint e ventola che c'erano.",
+          "comfort_extra_power": "Si somma alla soglia di cessione: tornando al comfort il clima consuma di piu', e senza questo margine farebbe scattare da solo il ritorno in eco. Zero per non usarlo.",
+          "active_to": "Fuori da questa fascia non si tocca niente. A fine fascia chi e' in eco resta com'e'."
+        }
       }
     },
     "abort": {
@@ -54,8 +76,9 @@
         "menu_options": {
           "zona": "Climatizzatori e sensori",
           "aperture": "Porte e finestre",
-          "range": "Temperature e finestre",
-          "regolazione": "Regolazione e prezzi"
+          "soglie": "Modulazione solare",
+          "range": "Modulazione continua: temperature e fasce",
+          "regolazione": "Modulazione continua: regolazione e prezzi"
         }
       },
       "zona": {
@@ -129,6 +152,28 @@
           "resume_on_close": "Si riaccende solo un clima che era acceso e che abbiamo fermato noi, con modalita', temperatura e ventola di prima.",
           "resume_limit": "Zero significa riaccendere sempre. Utile per chi esce lasciando la finestra aperta: al rientro il clima resta spento."
         }
+      },
+      "soglie": {
+        "title": "Modulazione solare",
+        "description": "A soglie: i clima che accendi tu restano al setpoint e alla ventola che hai scelto (il comfort) e passano in eco quando si preleva dalla rete. Non vengono mai accesi ne' spenti. Si tocca solo un clima in raffrescamento con il setpoint piu' basso dell'eco.",
+        "data": {
+          "mode": "Modalita'",
+          "eco_temperature": "Temperatura eco",
+          "eco_fan": "Ventilazione eco",
+          "import_threshold": "Va in eco con un prelievo oltre",
+          "import_minutes": "per almeno",
+          "export_threshold": "Torna al comfort con una cessione oltre",
+          "export_minutes": "per almeno",
+          "comfort_extra_power": "Consumo in piu' di ogni clima al comfort",
+          "active_from": "Attiva dalle",
+          "active_to": "fino alle"
+        },
+        "data_description": {
+          "eco_fan": "Il nome esatto della modalita', come la espone il climatizzatore (per esempio Auto). Lascia vuoto per non toccare la ventilazione.",
+          "export_threshold": "Il comfort torna rimettendo esattamente setpoint e ventola che c'erano.",
+          "comfort_extra_power": "Si somma alla soglia di cessione: tornando al comfort il clima consuma di piu', e senza questo margine farebbe scattare da solo il ritorno in eco. Zero per non usarlo.",
+          "active_to": "Fuori da questa fascia non si tocca niente. A fine fascia chi e' in eco resta com'e'."
+        }
       }
     },
     "error": {
@@ -172,6 +217,12 @@
       "options": {
         "off": "Spegni",
         "fan_only": "Solo ventilazione"
+      }
+    },
+    "modalita": {
+      "options": {
+        "thresholds": "A soglie (comfort / eco)",
+        "continuous": "Continua"
       }
     }
   }

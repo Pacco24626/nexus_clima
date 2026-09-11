@@ -103,7 +103,7 @@ def leggi(entita):
 
 
 async def prova():
-    for con_rete in (False, True):
+    for con_rete, modalita in ((False, None), (True, const.MODALITA_SOGLIE), (True, const.MODALITA_CONTINUA)):
         finto_ha.azzera_memoria()
         hass = nuovo_impianto()
         hass.imposta(FINESTRA, "off")
@@ -117,6 +117,7 @@ async def prova():
         }
         if con_rete:
             dati[const.CONF_SENSORE_RETE] = "sensor.rete"
+            dati[const.CONF_MODALITA] = modalita
         entry = Entry(dati)
         c = ClimaController(hass, entry)
         hass.data = {const.DOMAIN: {entry.entry_id: c}}
@@ -126,13 +127,14 @@ async def prova():
         for modulo in (binary_sensor, button, sensor, switch):
             tutte += await crea(modulo, hass, entry)
         nomi = sorted(e._attr_name for e in tutte)
-        etichetta = "con rete" if con_rete else "senza rete"
+        etichetta = f"rete, {modalita}" if con_rete else "senza rete"
 
         attese = {"Pausa Clima Salotto", "Non riaccendere Clima Salotto", "Stato",
                   "Pausa per aperture"}
         if con_rete:
-            attese |= {"Modulazione solare", "Riprendi il controllo", "Pavimento raggiungibile",
-                       "Deriva", "Energia della zona"}
+            attese |= {"Modulazione solare", "Deriva", "Energia della zona"}
+        if modalita == const.MODALITA_CONTINUA:
+            attese |= {"Riprendi il controllo", "Pavimento raggiungibile"}
         v(f"{etichetta}: le entita' giuste", set(nomi) == attese, nomi)
 
         prima = [leggi(e) for e in tutte]

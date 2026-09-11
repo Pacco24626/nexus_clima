@@ -35,9 +35,31 @@ from .const import (
     CONF_CLIMI,
     CONF_COMFORT_A,
     CONF_COMFORT_DA,
+    CONF_ATTIVA_A,
+    CONF_ATTIVA_DA,
+    CONF_CONSUMO_IN_PIU,
+    CONF_ECO_TEMP,
+    CONF_ECO_VENTOLA,
     CONF_INTERVALLO,
     CONF_LIMITE_RIACCENSIONE,
+    CONF_MODALITA,
     CONF_NOME,
+    CONF_SOGLIA_CESSIONE,
+    CONF_SOGLIA_PRELIEVO,
+    CONF_TEMPO_CESSIONE,
+    CONF_TEMPO_PRELIEVO,
+    DEFAULT_ATTIVA_A,
+    DEFAULT_ATTIVA_DA,
+    DEFAULT_CONSUMO_IN_PIU,
+    DEFAULT_ECO_TEMP,
+    DEFAULT_ECO_VENTOLA,
+    DEFAULT_MODALITA,
+    DEFAULT_SOGLIA_CESSIONE,
+    DEFAULT_SOGLIA_PRELIEVO,
+    DEFAULT_TEMPO_CESSIONE,
+    DEFAULT_TEMPO_PRELIEVO,
+    MODALITA_CONTINUA,
+    MODALITA_SOGLIE,
     CONF_P_A_T_MAX,
     CONF_P_A_T_MIN,
     CONF_PASSO,
@@ -231,6 +253,60 @@ def _schema_regolazione(d: dict[str, Any]) -> vol.Schema:
     )
 
 
+def _schema_soglie(d: dict[str, Any]) -> vol.Schema:
+    """La modulazione solare: modalita', e i parametri di quella a soglie."""
+
+    def _numero(minimo: float, massimo: float, passo: float, unita: str) -> selector.NumberSelector:
+        return selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=minimo, max=massimo, step=passo, unit_of_measurement=unita,
+                mode=selector.NumberSelectorMode.BOX,
+            )
+        )
+
+    return vol.Schema(
+        {
+            vol.Required(CONF_MODALITA, default=d.get(CONF_MODALITA, DEFAULT_MODALITA)): (
+                selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[MODALITA_SOGLIE, MODALITA_CONTINUA],
+                        translation_key="modalita",
+                        mode=selector.SelectSelectorMode.LIST,
+                    )
+                )
+            ),
+            vol.Required(CONF_ECO_TEMP, default=d.get(CONF_ECO_TEMP, DEFAULT_ECO_TEMP)): _numero(
+                16, 30, 0.5, "°C"
+            ),
+            vol.Optional(
+                CONF_ECO_VENTOLA,
+                description={"suggested_value": d.get(CONF_ECO_VENTOLA, DEFAULT_ECO_VENTOLA)},
+            ): str,
+            vol.Required(
+                CONF_SOGLIA_PRELIEVO, default=d.get(CONF_SOGLIA_PRELIEVO, DEFAULT_SOGLIA_PRELIEVO)
+            ): _numero(0, 6000, 50, "W"),
+            vol.Required(
+                CONF_TEMPO_PRELIEVO, default=d.get(CONF_TEMPO_PRELIEVO, DEFAULT_TEMPO_PRELIEVO)
+            ): _numero(0, 120, 1, "min"),
+            vol.Required(
+                CONF_SOGLIA_CESSIONE, default=d.get(CONF_SOGLIA_CESSIONE, DEFAULT_SOGLIA_CESSIONE)
+            ): _numero(0, 6000, 50, "W"),
+            vol.Required(
+                CONF_TEMPO_CESSIONE, default=d.get(CONF_TEMPO_CESSIONE, DEFAULT_TEMPO_CESSIONE)
+            ): _numero(0, 120, 1, "min"),
+            vol.Required(
+                CONF_CONSUMO_IN_PIU, default=d.get(CONF_CONSUMO_IN_PIU, DEFAULT_CONSUMO_IN_PIU)
+            ): _numero(0, 3000, 50, "W"),
+            vol.Required(
+                CONF_ATTIVA_DA, default=d.get(CONF_ATTIVA_DA, DEFAULT_ATTIVA_DA)
+            ): selector.TimeSelector(),
+            vol.Required(
+                CONF_ATTIVA_A, default=d.get(CONF_ATTIVA_A, DEFAULT_ATTIVA_A)
+            ): selector.TimeSelector(),
+        }
+    )
+
+
 # I campi fissi del passo delle aperture. Gli altri campi di quel passo sono
 # uno per climatizzatore, e cambiano con la zona.
 _CAMPI_APERTURE = (
@@ -403,11 +479,21 @@ class NexusClimaConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_show_form(
                     step_id="aperture", data_schema=_schema_aperture(etichette, dati), errors=errori
                 )
-            return self.async_create_entry(title=self._zona[CONF_NOME], data=dati)
+            self._zona = dati
+            # Senza sensore di rete la modulazione non c'e': niente da chiedere.
+            if not dati.get(CONF_SENSORE_RETE):
+                return self.async_create_entry(title=dati[CONF_NOME], data=dati)
+            return await self.async_step_soglie()
 
         return self.async_show_form(
             step_id="aperture", data_schema=_schema_aperture(etichette, self._zona)
         )
+
+    async def async_step_soglie(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            dati = {**self._zona, **user_input}
+            return self.async_create_entry(title=dati[CONF_NOME], data=dati)
+        return self.async_show_form(step_id="soglie", data_schema=_schema_soglie(self._zona))
 
     @staticmethod
     @callback
@@ -424,8 +510,15 @@ class NexusClimaOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
-            step_id="init", menu_options=["zona", "aperture", "range", "regolazione"]
+            step_id="init",
+            menu_options=["zona", "aperture", "soglie", "range", "regolazione"],
         )
+
+    async def async_step_soglie(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        schema = _schema_soglie(self._corrente)
+        if user_input is not None:
+            return self._salva(_unito(self._corrente, user_input, schema))
+        return self.async_show_form(step_id="soglie", data_schema=schema)
 
     async def async_step_zona(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         schema = _schema_zona(self._corrente, False)
