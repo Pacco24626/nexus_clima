@@ -645,7 +645,10 @@ class ClimaController:
     # Applicazione
     # -------------------------------------------------------------------------
     async def _async_ciclo(self, adesso: datetime | None = None) -> None:
-        adesso = adesso or dt_util.now()
+        # Il timer periodico di Home Assistant passa l'istante in UTC. Le fasce
+        # (carica, comfort, attiva) sono in ora locale: confrontate con l'UTC
+        # a Roma d'estate si spostano di due ore. Si converte sempre.
+        adesso = dt_util.as_local(adesso) if adesso is not None else dt_util.now()
 
         self._aggiorna_storia(adesso)
         self._aggiorna_apprendimento(adesso)

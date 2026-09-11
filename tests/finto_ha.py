@@ -202,7 +202,13 @@ _modulo(
     async_track_time_interval=lambda *a, **k: (lambda: None),
 )
 _modulo("homeassistant.helpers.storage", Store=Store)
-_modulo("homeassistant.util", dt=types.SimpleNamespace(now=OROLOGIO.now, as_local=lambda d: d))
+# Il fuso "locale" dell'impianto finto. UTC per le prove che non c'entrano,
+# un fuso vero per quelle che devono distinguere l'ora locale dall'UTC.
+FUSO = [timezone.utc]
+_modulo(
+    "homeassistant.util",
+    dt=types.SimpleNamespace(now=OROLOGIO.now, as_local=lambda d: d.astimezone(FUSO[0])),
+)
 _cv = _modulo(
     "homeassistant.helpers.config_validation",
     config_entry_only_config_schema=lambda dominio: None,

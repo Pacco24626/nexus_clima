@@ -16,7 +16,7 @@ import json
 import os
 import sys
 import types
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -329,6 +329,23 @@ async def scenari():
         viste.add(istantanea(c))
     v("20 min di prelievo fino all'eco: 3 stati (attesa, eco, attesa del ritorno)",
       len(viste) == 3, sorted(viste))
+
+    # --- 17. la fascia e' in ora locale, anche quando il ciclo riceve l'UTC ---------
+    # Il timer periodico di Home Assistant passa l'istante in UTC. Confrontato
+    # com'e' con la fascia 10-19, a Roma d'estate la sposta alle 12-21: trovato
+    # sul campo l'11/09/2026, zone ancora "in fascia" fino alle 21.
+    finto_ha.FUSO[0] = timezone(timedelta(hours=2))
+    try:
+        hass, c = await impianto()
+        roma = finto_ha.FUSO[0]
+        await c._async_ciclo(datetime(2026, 9, 11, 20, 30, tzinfo=roma).astimezone(timezone.utc))
+        v("20:30 a Roma (18:30 UTC): fascia 10-19 chiusa",
+          c.stato == const.STATO_FUORI, (c.stato, c.motivo))
+        await c._async_ciclo(datetime(2026, 9, 11, 11, 0, tzinfo=roma).astimezone(timezone.utc))
+        v("11:00 a Roma (09:00 UTC): fascia 10-19 aperta",
+          c.stato != const.STATO_FUORI, (c.stato, c.motivo))
+    finally:
+        finto_ha.FUSO[0] = timezone.utc
 
 
 def prove_pure():
