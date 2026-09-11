@@ -1,9 +1,13 @@
 """Configurazione di una zona climatica.
 
-Alla creazione si chiede il minimo che serve per partire. Tutto il resto —
-potenze, prezzi, ventilazione, tempi — sta nelle opzioni, divise in tre
-sezioni: durante la stagione quei valori si cambiano spesso, e non deve
-servire toccare il codice per farlo.
+Alla creazione si chiede il minimo che serve per partire: i climatizzatori, e
+poi le porte e finestre di ciascuno. Tutto il resto — potenze, prezzi,
+ventilazione, tempi — sta nelle opzioni, divise per sezione: durante la
+stagione quei valori si cambiano spesso, e non deve servire toccare il codice
+per farlo.
+
+Il sensore di rete e' facoltativo. Senza, la zona non modula sul fotovoltaico
+e gestisce solo le aperture; ma almeno una delle due cose deve farla.
 """
 
 from __future__ import annotations
@@ -21,14 +25,18 @@ from homeassistant.config_entries import (
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 
+from .aperture import AZIONE_SPEGNI, AZIONE_VENTILAZIONE
 from .const import (
     CONF_ACCOPPIATE,
+    CONF_APERTURE,
+    CONF_AZIONE_APERTURA,
     CONF_CARICA_A,
     CONF_CARICA_DA,
     CONF_CLIMI,
     CONF_COMFORT_A,
     CONF_COMFORT_DA,
     CONF_INTERVALLO,
+    CONF_LIMITE_RIACCENSIONE,
     CONF_NOME,
     CONF_P_A_T_MAX,
     CONF_P_A_T_MIN,
@@ -38,6 +46,9 @@ from .const import (
     CONF_PREZZO_ACQUISTO,
     CONF_PREZZO_CESSIONE,
     CONF_RETE_POSITIVA_IMPORT,
+    CONF_RIACCENDI,
+    CONF_RITARDO_APERTURA,
+    CONF_RITARDO_CHIUSURA,
     CONF_SENSORE_ESTERNA,
     CONF_SENSORE_POTENZA,
     CONF_SENSORE_RETE,
@@ -48,9 +59,11 @@ from .const import (
     CONF_USA_VENTOLA,
     CONF_VENTOLA_BASE,
     CONF_VENTOLA_SPINTA,
+    DEFAULT_AZIONE_APERTURA,
     DEFAULT_COMFORT_A,
     DEFAULT_COMFORT_DA,
     DEFAULT_INTERVALLO,
+    DEFAULT_LIMITE_RIACCENSIONE,
     DEFAULT_P_A_T_MAX,
     DEFAULT_P_A_T_MIN,
     DEFAULT_PASSO,
@@ -58,6 +71,8 @@ from .const import (
     DEFAULT_PERMANENZA,
     DEFAULT_PREZZO_ACQUISTO,
     DEFAULT_PREZZO_CESSIONE,
+    DEFAULT_RITARDO_APERTURA,
+    DEFAULT_RITARDO_CHIUSURA,
     DEFAULT_T_COMFORT,
     DEFAULT_T_MAX,
     DEFAULT_T_MIN,
@@ -108,7 +123,7 @@ def _schema_zona(d: dict[str, Any], nuovo: bool) -> vol.Schema:
             vol.Optional(
                 CONF_ACCOPPIATE, description={"suggested_value": d.get(CONF_ACCOPPIATE)}
             ): _climi(),
-            vol.Required(
+            vol.Optional(
                 CONF_SENSORE_RETE, description={"suggested_value": d.get(CONF_SENSORE_RETE)}
             ): _sensore("power"),
             vol.Required(
@@ -216,6 +231,116 @@ def _schema_regolazione(d: dict[str, Any]) -> vol.Schema:
     )
 
 
+# I campi fissi del passo delle aperture. Gli altri campi di quel passo sono
+# uno per climatizzatore, e cambiano con la zona.
+_CAMPI_APERTURE = (
+    CONF_RITARDO_APERTURA,
+    CONF_RITARDO_CHIUSURA,
+    CONF_AZIONE_APERTURA,
+    CONF_RIACCENDI,
+    CONF_LIMITE_RIACCENSIONE,
+)
+
+
+def _etichette_climi(hass: Any, climi: list[str]) -> dict[str, str]:
+    """Etichetta del campo -> climatizzatore.
+
+    Il campo prende il nome del clima: per campi che dipendono dalla
+    configurazione non ci sono traduzioni possibili, e un entity_id come
+    etichetta e' leggibile solo da chi l'ha scritto.
+    """
+    etichette: dict[str, str] = {}
+    for clima in climi:
+        stato = hass.states.get(clima)
+        nome = clima
+        if stato is not None and stato.attributes.get("friendly_name"):
+            nome = str(stato.attributes["friendly_name"])
+        if nome in etichette or nome in _CAMPI_APERTURE:
+            nome = f"{nome} ({clima})"
+        etichette[nome] = clima
+    return etichette
+
+
+def _schema_aperture(etichette: dict[str, str], d: dict[str, Any]) -> vol.Schema:
+    correnti = d.get(CONF_APERTURE) or {}
+    campi: dict[Any, Any] = {}
+    for etichetta, clima in etichette.items():
+        campi[
+            vol.Optional(etichetta, description={"suggested_value": correnti.get(clima) or []})
+        ] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain="binary_sensor", multiple=True)
+        )
+
+    def _secondi(massimo: int) -> selector.NumberSelector:
+        return selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=massimo, step=5, unit_of_measurement="s",
+                mode=selector.NumberSelectorMode.BOX,
+            )
+        )
+
+    campi.update(
+        {
+            vol.Required(
+                CONF_RITARDO_APERTURA,
+                default=d.get(CONF_RITARDO_APERTURA, DEFAULT_RITARDO_APERTURA),
+            ): _secondi(3600),
+            vol.Required(
+                CONF_RITARDO_CHIUSURA,
+                default=d.get(CONF_RITARDO_CHIUSURA, DEFAULT_RITARDO_CHIUSURA),
+            ): _secondi(3600),
+            vol.Required(
+                CONF_AZIONE_APERTURA,
+                default=d.get(CONF_AZIONE_APERTURA, DEFAULT_AZIONE_APERTURA),
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[AZIONE_SPEGNI, AZIONE_VENTILAZIONE],
+                    translation_key="azione_apertura",
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            ),
+            vol.Required(CONF_RIACCENDI, default=d.get(CONF_RIACCENDI, True)): bool,
+            vol.Required(
+                CONF_LIMITE_RIACCENSIONE,
+                default=d.get(CONF_LIMITE_RIACCENSIONE, DEFAULT_LIMITE_RIACCENSIONE),
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0, max=1440, step=15, unit_of_measurement="min",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+        }
+    )
+    return vol.Schema(campi)
+
+
+def _aperture_da(user_input: dict[str, Any], etichette: dict[str, str]) -> dict[str, Any]:
+    """Dal modulo alla configurazione: i campi per clima diventano un dizionario.
+
+    Si ricostruisce da zero: un clima a cui si sono tolti tutti i sensori deve
+    sparire, non restare con quelli di prima.
+    """
+    aperture = {
+        etichette[chiave]: list(valore)
+        for chiave, valore in user_input.items()
+        if chiave in etichette and valore
+    }
+    resto = {chiave: valore for chiave, valore in user_input.items() if chiave not in etichette}
+    return {**resto, CONF_APERTURE: aperture}
+
+
+def _valida_scopo(dati: dict[str, Any]) -> dict[str, str]:
+    """Una zona deve fare almeno una cosa: modulare, o fermare a finestra aperta."""
+    aperture = {
+        clima: sensori
+        for clima, sensori in (dati.get(CONF_APERTURE) or {}).items()
+        if clima in (dati.get(CONF_CLIMI) or []) and sensori
+    }
+    if not dati.get(CONF_SENSORE_RETE) and not aperture:
+        return {"base": "niente_da_fare"}
+    return {}
+
+
 def _valida(dati: dict[str, Any]) -> dict[str, str]:
     t_min = float(dati.get(CONF_T_MIN, DEFAULT_T_MIN))
     t_comfort = float(dati.get(CONF_T_COMFORT, DEFAULT_T_COMFORT))
@@ -235,19 +360,54 @@ def _valida(dati: dict[str, Any]) -> dict[str, str]:
     return {}
 
 
+
+def _unito(corrente: dict[str, Any], modifiche: dict[str, Any], schema: vol.Schema) -> dict[str, Any]:
+    """La configurazione dopo un passo delle opzioni.
+
+    Un campo facoltativo svuotato nel modulo non arriva affatto: se ci si
+    limitasse a sovrapporre, il valore vecchio resterebbe e non ci sarebbe modo
+    di togliere, per esempio, il sensore di rete o la finestra di carica.
+    """
+    unito = {**corrente, **modifiche}
+    for chiave in schema.schema:
+        if isinstance(chiave, vol.Optional) and str(chiave) not in modifiche:
+            unito.pop(str(chiave), None)
+    return unito
+
+
 class NexusClimaConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Creazione di una zona."""
+    """Creazione di una zona: climatizzatori e sensori, poi porte e finestre."""
 
     VERSION = 1
+
+    def __init__(self) -> None:
+        self._zona: dict[str, Any] = {}
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         if user_input is not None:
             nome = user_input[CONF_NOME]
             await self.async_set_unique_id(nome.strip().lower())
             self._abort_if_unique_id_configured()
-            return self.async_create_entry(title=nome, data=user_input)
+            self._zona = dict(user_input)
+            return await self.async_step_aperture()
 
         return self.async_show_form(step_id="user", data_schema=_schema_zona({}, True))
+
+    async def async_step_aperture(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        etichette = _etichette_climi(self.hass, self._zona.get(CONF_CLIMI) or [])
+        if user_input is not None:
+            dati = {**self._zona, **_aperture_da(user_input, etichette)}
+            if errori := _valida_scopo(dati):
+                return self.async_show_form(
+                    step_id="aperture", data_schema=_schema_aperture(etichette, dati), errors=errori
+                )
+            return self.async_create_entry(title=self._zona[CONF_NOME], data=dati)
+
+        return self.async_show_form(
+            step_id="aperture", data_schema=_schema_aperture(etichette, self._zona)
+        )
 
     @staticmethod
     @callback
@@ -264,40 +424,61 @@ class NexusClimaOptionsFlow(OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         return self.async_show_menu(
-            step_id="init", menu_options=["zona", "range", "regolazione"]
+            step_id="init", menu_options=["zona", "aperture", "range", "regolazione"]
         )
 
     async def async_step_zona(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        schema = _schema_zona(self._corrente, False)
         if user_input is not None:
-            return self._salva(user_input)
-        return self.async_show_form(step_id="zona", data_schema=_schema_zona(self._corrente, False))
+            unito = _unito(self._corrente, user_input, schema)
+            if errori := _valida_scopo(unito):
+                return self.async_show_form(
+                    step_id="zona", data_schema=_schema_zona(unito, False), errors=errori
+                )
+            return self._salva(unito)
+        return self.async_show_form(step_id="zona", data_schema=schema)
+
+    async def async_step_aperture(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        etichette = _etichette_climi(self.hass, self._corrente.get(CONF_CLIMI) or [])
+        if user_input is not None:
+            unito = {**self._corrente, **_aperture_da(user_input, etichette)}
+            if errori := _valida_scopo(unito):
+                return self.async_show_form(
+                    step_id="aperture", data_schema=_schema_aperture(etichette, unito), errors=errori
+                )
+            return self._salva(unito)
+        return self.async_show_form(
+            step_id="aperture", data_schema=_schema_aperture(etichette, self._corrente)
+        )
 
     async def async_step_range(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        schema = _schema_range(self._corrente)
         if user_input is not None:
-            if errori := _valida({**self._corrente, **user_input}):
+            unito = _unito(self._corrente, user_input, schema)
+            if errori := _valida(unito):
                 return self.async_show_form(
-                    step_id="range", data_schema=_schema_range(user_input), errors=errori
+                    step_id="range", data_schema=_schema_range(unito), errors=errori
                 )
-            return self._salva(user_input)
-        return self.async_show_form(step_id="range", data_schema=_schema_range(self._corrente))
+            return self._salva(unito)
+        return self.async_show_form(step_id="range", data_schema=schema)
 
     async def async_step_regolazione(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        schema = _schema_regolazione(self._corrente)
         if user_input is not None:
-            if errori := _valida({**self._corrente, **user_input}):
+            unito = _unito(self._corrente, user_input, schema)
+            if errori := _valida(unito):
                 return self.async_show_form(
-                    step_id="regolazione",
-                    data_schema=_schema_regolazione(user_input),
-                    errors=errori,
+                    step_id="regolazione", data_schema=_schema_regolazione(unito), errors=errori
                 )
-            return self._salva(user_input)
-        return self.async_show_form(
-            step_id="regolazione", data_schema=_schema_regolazione(self._corrente)
-        )
+            return self._salva(unito)
+        return self.async_show_form(step_id="regolazione", data_schema=schema)
 
-    def _salva(self, modifiche: dict[str, Any]) -> ConfigFlowResult:
+    def _salva(self, unito: dict[str, Any]) -> ConfigFlowResult:
         """Le opzioni contengono sempre la configurazione completa."""
-        unito = {**self._corrente, **modifiche}
+        unito = dict(unito)
         unito.pop(CONF_NOME, None)
         return self.async_create_entry(title="", data=unito)

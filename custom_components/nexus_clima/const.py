@@ -8,7 +8,12 @@ DOMAIN = "nexus_clima"
 MANUFACTURER = "Nexus-T"
 MODEL = "Controllo termico solare"
 
-PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR, Platform.SWITCH]
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.SENSOR,
+    Platform.SWITCH,
+]
 
 # --- Configurazione della zona ------------------------------------------------
 CONF_NOME = "name"
@@ -54,6 +59,15 @@ CONF_PAUSA_MANUALE = "manual_hold"
 CONF_PREZZO_ACQUISTO = "buy_price"
 CONF_PREZZO_CESSIONE = "sell_price"
 
+# Porte e finestre. "Aperture" e non "finestre": in questa integrazione la
+# finestra e' gia' la fascia oraria di carica o di comfort.
+CONF_APERTURE = "openings"  # {climate: [binary_sensor, ...]}
+CONF_RITARDO_APERTURA = "open_delay"
+CONF_RITARDO_CHIUSURA = "close_delay"
+CONF_AZIONE_APERTURA = "open_action"
+CONF_RIACCENDI = "resume_on_close"
+CONF_LIMITE_RIACCENSIONE = "resume_limit"
+
 # --- Valori predefiniti -------------------------------------------------------
 DEFAULT_T_MIN = 22.0
 DEFAULT_T_COMFORT = 25.0
@@ -79,6 +93,15 @@ DEFAULT_PAUSA_MANUALE = 180
 
 DEFAULT_PREZZO_ACQUISTO = 0.25
 DEFAULT_PREZZO_CESSIONE = 0.08
+
+# Un minuto di apertura prima di fermare: chi passa da una porta non deve
+# spegnere il clima. Mezzo minuto di chiusura prima di riaccendere: una
+# finestra richiusa e subito riaperta non deve far ripartire il compressore.
+DEFAULT_RITARDO_APERTURA = 60
+DEFAULT_RITARDO_CHIUSURA = 30
+DEFAULT_AZIONE_APERTURA = "off"
+# Zero: si riaccende sempre, qualunque sia stata la durata dell'apertura.
+DEFAULT_LIMITE_RIACCENSIONE = 0
 
 # --- Regolazione --------------------------------------------------------------
 # Mezzo grado di isteresi sulla mappatura: sotto questa soglia il setpoint non
@@ -114,6 +137,15 @@ ATTESA_CONFERMA = 5.0
 RITENTATIVI = 3
 SPAZIATURA = 2.0
 
+# Una macchina che passa da un cloud impiega di piu' a riportare l'accensione
+# che un setpoint: si aspetta di piu' prima di confrontare il resto.
+ATTESA_ACCENSIONE = 10.0
+
+# Dopo un ripristino, per quanto un setpoint diverso dall'ultimo comandato non
+# va letto come un comando manuale: la macchina riaccesa puo' riportare per
+# qualche secondo il valore che ricordava lei.
+TOLLERANZA_RIPRISTINO = 60
+
 # --- Stati --------------------------------------------------------------------
 STATO_CARICA = "carica"
 STATO_COMFORT = "comfort"
@@ -121,6 +153,8 @@ STATO_MANUALE = "manuale"
 STATO_FUORI = "fuori_finestra"
 STATO_DISABILITATO = "disabilitato"
 STATO_NON_PRONTO = "non_pronto"
+STATO_APERTURA = "apertura"
+STATO_SENZA_MODULAZIONE = "senza_modulazione"
 
 # --- Chiavi delle entita' -----------------------------------------------------
 KEY_ABILITATO = "enabled"
@@ -129,3 +163,6 @@ KEY_PAVIMENTO = "floor"
 KEY_DERIVA = "drift"
 KEY_RENDICONTO = "report"
 KEY_RIPRENDI = "resume"
+KEY_APERTURE = "openings_enabled"
+KEY_PAUSA = "opening_pause"  # + _<climate>
+KEY_NON_RIACCENDERE = "keep_off"  # + _<climate>

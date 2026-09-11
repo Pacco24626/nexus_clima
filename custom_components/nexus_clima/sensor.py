@@ -35,14 +35,18 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     controller: ClimaController = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        [
-            StatoSensor(controller),
-            PavimentoSensor(controller),
-            DerivaSensor(controller),
-            RendicontoSensor(controller),
-        ]
-    )
+    entita: list[SensorEntity] = [StatoSensor(controller)]
+    # Senza sensore di rete la zona serve solo per le aperture: pavimento,
+    # deriva e rendiconto riguardano la modulazione e non avrebbero senso.
+    if controller.modulazione:
+        entita.extend(
+            [
+                PavimentoSensor(controller),
+                DerivaSensor(controller),
+                RendicontoSensor(controller),
+            ]
+        )
+    async_add_entities(entita)
 
 
 class StatoSensor(ClimaEntity, SensorEntity):
@@ -70,6 +74,7 @@ class StatoSensor(ClimaEntity, SensorEntity):
             "potenza_stimata_w": round(c.potenza_stimata()),
             "ventilazione": c.ventola_corrente,
             "climi_accesi": c.climi_accesi,
+            "in_pausa_per_apertura": c.aperture.pausati() if c.aperture is not None else [],
             "minuti_per_stato": {k: round(v) for k, v in c.minuti_stato.items()},
         }
 

@@ -17,12 +17,34 @@
         "data_description": {
           "coupled": "Macchine di altre zone che condividono l'aria con questa, per esempio con le porte aperte. Servono a non farle lavorare l'una contro l'altra.",
           "temp_sensor": "Se non la indichi viene usata quella riportata dal climatizzatore.",
-          "power_sensor": "Se manca, la potenza viene stimata dai valori dichiarati nelle opzioni."
+          "power_sensor": "Se manca, la potenza viene stimata dai valori dichiarati nelle opzioni.",
+          "grid_sensor": "Facoltativo. Senza, la zona non modula sul fotovoltaico e gestisce solo porte e finestre."
+        }
+      },
+      "aperture": {
+        "title": "Porte e finestre",
+        "description": "Per ogni climatizzatore scegli i sensori di porte e finestre del suo ambiente. Basta un'apertura per fermarlo; lascia vuoto un clima che non deve fermarsi mai.",
+        "data": {
+          "open_delay": "Aperta da almeno",
+          "close_delay": "Chiusa da almeno",
+          "open_action": "Con l'apertura aperta",
+          "resume_on_close": "Riaccendi alla chiusura com'era",
+          "resume_limit": "Non riaccendere dopo un'apertura piu' lunga di"
+        },
+        "data_description": {
+          "open_delay": "Prima di fermare il clima. Chi passa da una porta non deve spegnerlo.",
+          "close_delay": "Prima di riaccenderlo. Una finestra richiusa e subito riaperta non deve far ripartire il compressore.",
+          "open_action": "La ventilazione si usa solo se il climatizzatore la sa fare; altrimenti si spegne.",
+          "resume_on_close": "Si riaccende solo un clima che era acceso e che abbiamo fermato noi, con modalita', temperatura e ventola di prima.",
+          "resume_limit": "Zero significa riaccendere sempre. Utile per chi esce lasciando la finestra aperta: al rientro il clima resta spento."
         }
       }
     },
     "abort": {
       "already_configured": "Esiste gia' una zona con questo nome."
+    },
+    "error": {
+      "niente_da_fare": "La zona deve fare almeno una cosa: indica il sensore di rete per la modulazione solare, oppure almeno un sensore di porta o finestra."
     }
   },
   "options": {
@@ -31,6 +53,7 @@
         "title": "Configurazione della zona",
         "menu_options": {
           "zona": "Climatizzatori e sensori",
+          "aperture": "Porte e finestre",
           "range": "Temperature e finestre",
           "regolazione": "Regolazione e prezzi"
         }
@@ -45,6 +68,9 @@
           "temp_sensor": "Sonda di temperatura della zona",
           "outdoor_sensor": "Sonda di temperatura esterna",
           "power_sensor": "Contatore dedicato ai climatizzatori"
+        },
+        "data_description": {
+          "grid_sensor": "Facoltativo. Senza, la zona non modula sul fotovoltaico e gestisce solo porte e finestre."
         }
       },
       "range": {
@@ -85,26 +111,68 @@
           "fan_boost": "Il nome esatto della modalita', come la espone il climatizzatore. Lascia vuoto per non spingere la ventilazione.",
           "manual_hold": "Zero significa fino alla mezzanotte successiva."
         }
+      },
+      "aperture": {
+        "title": "Porte e finestre",
+        "description": "Per ogni climatizzatore scegli i sensori di porte e finestre del suo ambiente. Basta un'apertura per fermarlo; lascia vuoto un clima che non deve fermarsi mai.",
+        "data": {
+          "open_delay": "Aperta da almeno",
+          "close_delay": "Chiusa da almeno",
+          "open_action": "Con l'apertura aperta",
+          "resume_on_close": "Riaccendi alla chiusura com'era",
+          "resume_limit": "Non riaccendere dopo un'apertura piu' lunga di"
+        },
+        "data_description": {
+          "open_delay": "Prima di fermare il clima. Chi passa da una porta non deve spegnerlo.",
+          "close_delay": "Prima di riaccenderlo. Una finestra richiusa e subito riaperta non deve far ripartire il compressore.",
+          "open_action": "La ventilazione si usa solo se il climatizzatore la sa fare; altrimenti si spegne.",
+          "resume_on_close": "Si riaccende solo un clima che era acceso e che abbiamo fermato noi, con modalita', temperatura e ventola di prima.",
+          "resume_limit": "Zero significa riaccendere sempre. Utile per chi esce lasciando la finestra aperta: al rientro il clima resta spento."
+        }
       }
     },
     "error": {
       "range_incoerente": "Deve valere: minimo in carica ≤ minimo in comfort ≤ massimo.",
       "finestra_incompleta": "La finestra di carica vuole entrambe le ore, oppure nessuna.",
-      "potenze_incoerenti": "La potenza al minimo deve essere maggiore di quella al massimo."
+      "potenze_incoerenti": "La potenza al minimo deve essere maggiore di quella al massimo.",
+      "niente_da_fare": "La zona deve fare almeno una cosa: indica il sensore di rete per la modulazione solare, oppure almeno un sensore di porta o finestra."
     }
   },
   "entity": {
     "sensor": {
-      "state": { "name": "Stato" },
-      "floor": { "name": "Pavimento raggiungibile" },
-      "drift": { "name": "Deriva" },
-      "report": { "name": "Energia della zona" }
+      "state": {
+        "name": "Stato"
+      },
+      "floor": {
+        "name": "Pavimento raggiungibile"
+      },
+      "drift": {
+        "name": "Deriva"
+      },
+      "report": {
+        "name": "Energia della zona"
+      }
     },
     "switch": {
-      "enabled": { "name": "Abilitato" }
+      "enabled": {
+        "name": "Modulazione solare"
+      },
+      "openings_enabled": {
+        "name": "Pausa per aperture"
+      }
     },
     "button": {
-      "resume": { "name": "Riprendi il controllo" }
+      "resume": {
+        "name": "Riprendi il controllo"
+      }
+    }
+  },
+  "selector": {
+    "azione_apertura": {
+      "options": {
+        "off": "Spegni",
+        "fan_only": "Solo ventilazione"
+      }
     }
   }
 }

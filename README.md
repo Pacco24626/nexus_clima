@@ -3,9 +3,16 @@
 Modula i climatizzatori sul surplus fotovoltaico, tenendo il compressore
 sempre acceso al carico che il sole riesce a pagare.
 
+E li ferma quando si apre una porta o una finestra del loro ambiente, per
+rimetterli com'erano alla chiusura.
+
 Una voce di configurazione per zona: zone diverse hanno profili d'uso opposti
 — una camera si vive di notte, quando il fotovoltaico non produce; un salotto
 di giorno — e meritano politiche diverse, non un setpoint comune.
+
+Le due funzioni sono indipendenti. Senza sensore di rete la zona non modula
+sul fotovoltaico e gestisce soltanto porte e finestre: e' il caso di chi non
+ha un impianto.
 
 ## Perche' non basta accendere e spegnere
 
@@ -88,6 +95,45 @@ controllo** chiude la pausa in anticipo.
 
 E' il motivo per cui non serve una finestra oraria che spenga tutto la sera.
 
+## Porte e finestre
+
+Per ogni climatizzatore si scelgono i sensori del suo ambiente: contatti
+dell'antifurto, Shelly, Zigbee, qualunque `binary_sensor`. Basta un'apertura
+per fermarlo.
+
+| Opzione | Predefinito | |
+|---|---|---|
+| Aperta da almeno | 60 s | chi passa da una porta non deve spegnere il clima |
+| Chiusa da almeno | 30 s | una finestra richiusa e subito riaperta non deve far ripartire il compressore |
+| Con l'apertura aperta | Spegni | oppure *Solo ventilazione*, se la macchina la sa fare |
+| Riaccendi alla chiusura | si' | com'era: modalita', temperatura, ventola, oscillazione |
+| Non riaccendere dopo un'apertura piu' lunga di | 0 (sempre) | per chi esce lasciando la finestra aperta |
+
+Le regole, in ordine di importanza:
+
+1. **Una macchina spenta non viene mai accesa.** Si riaccende solo cio' che
+   era acceso e che l'integrazione ha fermato.
+2. **L'utente vince.** Un clima riacceso a mano con la finestra aperta resta
+   acceso fino alla chiusura. Il pulsante **Non riaccendere** vince sulla
+   riaccensione: il clima e' gia' spento, e spegnerlo di nuovo non cambia il
+   suo stato, quindi serve un comando a parte. In ventilazione basta
+   spegnerlo.
+3. **Il dubbio ferma.** Un sensore che non risponde non vale come chiuso: un
+   gateway dell'allarme che si riavvia rende indisponibili tutte le zone
+   insieme, e non deve riaccendere i clima con le finestre spalancate.
+
+Un clima acceso quando la finestra e' gia' aperta segue la stessa regola,
+dopo lo stesso ritardo. Le pause sopravvivono a un riavvio di Home Assistant;
+se nel frattempo qualcuno ha cambiato il clima a mano, vale quello.
+
+Alla riaccensione si manda solo cio' che differisce: molte macchine ricordano
+da sole setpoint e ventola, e alcune passano da un cloud con un tetto di
+chiamate al giorno.
+
+Un clima in pausa esce dalla modulazione solare finche' la pausa non si
+chiude: due automatismi sulle stesse macchine si pesterebbero i piedi, uno
+solo che conosce entrambe le cose no.
+
 ## Cosa impara
 
 | Parametro | Che cosa dice |
@@ -125,12 +171,42 @@ circuito dei climi e' l'investimento che rende attendibile tutto il resto.
 
 | Entita' | A che serve |
 |---|---|
-| `sensor` Stato | Cosa sta facendo e perche'; negli attributi surplus, setpoint obiettivo, minuti per stato |
-| `sensor` Pavimento raggiungibile | Il minimo reale della zona, appreso |
-| `sensor` Deriva | Gradi all'ora, con la deriva passiva negli attributi |
-| `sensor` Energia della zona | kWh di oggi, quota da surplus e valore in euro |
-| `switch` Abilitato | Sospende il controllo senza spegnere i climatizzatori |
-| `button` Riprendi il controllo | Chiude in anticipo la pausa manuale |
+| `sensor` Stato | Cosa sta facendo e perche'; negli attributi surplus, setpoint obiettivo, clima in pausa, minuti per stato |
+| `sensor` Pavimento raggiungibile | Il minimo reale della zona, appreso ¹ |
+| `sensor` Deriva | Gradi all'ora, con la deriva passiva negli attributi ¹ |
+| `sensor` Energia della zona | kWh di oggi, quota da surplus e valore in euro ¹ |
+| `switch` Modulazione solare | Sospende la modulazione senza spegnere i climatizzatori ¹ |
+| `button` Riprendi il controllo | Chiude in anticipo la pausa manuale ¹ |
+| `switch` Pausa per aperture | Spento, porte e finestre non fermano piu' i clima ² |
+| `binary_sensor` Pausa *clima* | Acceso mentre quel clima e' fermo per un'apertura; negli attributi le aperture aperte, cosa verra' ripristinato e se ² |
+| `button` Non riaccendere *clima* | Durante la pausa: alla chiusura resta spento ² |
+
+¹ solo con il sensore di rete. ² solo per i clima con almeno un sensore di
+apertura.
+
+In plancia, il pulsante si mostra solo quando serve con una card condizionale
+sul sensore della pausa:
+
+```yaml
+type: conditional
+conditions:
+  - condition: state
+    entity: binary_sensor.zona_giorno_pausa_clima_salotto
+    state: "on"
+card:
+  type: button
+  entity: button.zona_giorno_non_riaccendere_clima_salotto
+  name: Non riaccendere il clima
+```
+
+## Passare da un'automazione
+
+Chi ha gia' un'automazione «spegni a finestra aperta, riaccendi alla
+chiusura» la disattiva prima di configurare le aperture: due automatismi che
+salvano e ripristinano lo stesso clima si sovrascrivono a vicenda. Rispetto
+alla classica con `scene.create`, qui lo stato salvato sopravvive a un
+riavvio, la chiusura ha il suo ritardo, e un sensore che non risponde non
+riaccende niente.
 
 ## Installazione
 

@@ -17,12 +17,34 @@
         "data_description": {
           "coupled": "Units in other zones that share air with this one, for instance through an open door. Declaring them stops the zones fighting each other.",
           "temp_sensor": "If left empty, the temperature reported by the air conditioner is used.",
-          "power_sensor": "Without it, power is estimated from the values declared in the options."
+          "power_sensor": "Without it, power is estimated from the values declared in the options.",
+          "grid_sensor": "Optional. Without it the zone does not follow the solar surplus and only handles doors and windows."
+        }
+      },
+      "aperture": {
+        "title": "Doors and windows",
+        "description": "For each air conditioner, pick the door and window sensors of its room. One opening is enough to stop it; leave empty a unit that must never stop.",
+        "data": {
+          "open_delay": "Open for at least",
+          "close_delay": "Closed for at least",
+          "open_action": "While open",
+          "resume_on_close": "Restore on close as it was",
+          "resume_limit": "Do not restore after an opening longer than"
+        },
+        "data_description": {
+          "open_delay": "Before stopping the unit. Walking through a door must not switch it off.",
+          "close_delay": "Before restoring it. A window closed and reopened right away must not restart the compressor.",
+          "open_action": "Fan only is used when the unit supports it; otherwise it is switched off.",
+          "resume_on_close": "Only a unit that was on, and that was stopped by this integration, is restored — with its previous mode, temperature and fan.",
+          "resume_limit": "Zero means always restore. Useful when leaving with a window open: the unit stays off when you come back."
         }
       }
     },
     "abort": {
       "already_configured": "A zone with this name already exists."
+    },
+    "error": {
+      "niente_da_fare": "The zone must do at least one thing: set the grid sensor for solar modulation, or at least one door or window sensor."
     }
   },
   "options": {
@@ -31,6 +53,7 @@
         "title": "Zone configuration",
         "menu_options": {
           "zona": "Air conditioners and sensors",
+          "aperture": "Doors and windows",
           "range": "Temperatures and windows",
           "regolazione": "Control and prices"
         }
@@ -45,6 +68,9 @@
           "temp_sensor": "Zone temperature sensor",
           "outdoor_sensor": "Outdoor temperature sensor",
           "power_sensor": "Dedicated meter for the air conditioners"
+        },
+        "data_description": {
+          "grid_sensor": "Optional. Without it the zone does not follow the solar surplus and only handles doors and windows."
         }
       },
       "range": {
@@ -85,26 +111,68 @@
           "fan_boost": "The exact mode name as the unit exposes it. Leave empty to never push the fan.",
           "manual_hold": "Zero means until the following midnight."
         }
+      },
+      "aperture": {
+        "title": "Doors and windows",
+        "description": "For each air conditioner, pick the door and window sensors of its room. One opening is enough to stop it; leave empty a unit that must never stop.",
+        "data": {
+          "open_delay": "Open for at least",
+          "close_delay": "Closed for at least",
+          "open_action": "While open",
+          "resume_on_close": "Restore on close as it was",
+          "resume_limit": "Do not restore after an opening longer than"
+        },
+        "data_description": {
+          "open_delay": "Before stopping the unit. Walking through a door must not switch it off.",
+          "close_delay": "Before restoring it. A window closed and reopened right away must not restart the compressor.",
+          "open_action": "Fan only is used when the unit supports it; otherwise it is switched off.",
+          "resume_on_close": "Only a unit that was on, and that was stopped by this integration, is restored — with its previous mode, temperature and fan.",
+          "resume_limit": "Zero means always restore. Useful when leaving with a window open: the unit stays off when you come back."
+        }
       }
     },
     "error": {
       "range_incoerente": "It must hold that: charge minimum ≤ comfort minimum ≤ maximum.",
       "finestra_incompleta": "The charge window needs both times, or neither.",
-      "potenze_incoerenti": "Power at the minimum must be greater than power at the maximum."
+      "potenze_incoerenti": "Power at the minimum must be greater than power at the maximum.",
+      "niente_da_fare": "The zone must do at least one thing: set the grid sensor for solar modulation, or at least one door or window sensor."
     }
   },
   "entity": {
     "sensor": {
-      "state": { "name": "State" },
-      "floor": { "name": "Reachable floor" },
-      "drift": { "name": "Drift" },
-      "report": { "name": "Zone energy" }
+      "state": {
+        "name": "State"
+      },
+      "floor": {
+        "name": "Reachable floor"
+      },
+      "drift": {
+        "name": "Drift"
+      },
+      "report": {
+        "name": "Zone energy"
+      }
     },
     "switch": {
-      "enabled": { "name": "Enabled" }
+      "enabled": {
+        "name": "Solar modulation"
+      },
+      "openings_enabled": {
+        "name": "Pause on openings"
+      }
     },
     "button": {
-      "resume": { "name": "Resume control" }
+      "resume": {
+        "name": "Resume control"
+      }
+    }
+  },
+  "selector": {
+    "azione_apertura": {
+      "options": {
+        "off": "Switch off",
+        "fan_only": "Fan only"
+      }
     }
   }
 }

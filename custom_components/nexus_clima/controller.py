@@ -19,6 +19,11 @@ Quattro idee reggono questo file.
 
 4. **Il comando resta all'utente.** Un setpoint cambiato a mano e' un ordine,
    non un disturbo: il controller se ne accorge e si mette da parte.
+
+Sopra a tutto sta la pausa per porte e finestre aperte (gestore_aperture.py):
+un clima in pausa esce dalla modulazione finche' non viene ripristinato. Due
+automatismi sugli stessi climatizzatori si pesterebbero i piedi; uno solo che
+conosce entrambe le cose no.
 """
 
 from __future__ import annotations
@@ -59,6 +64,7 @@ from .const import (
     ATTESA_CONFERMA,
     CAMPIONI_MINIMI,
     CONF_ACCOPPIATE,
+    CONF_APERTURE,
     CONF_CARICA_A,
     CONF_CARICA_DA,
     CONF_CLIMI,
@@ -107,13 +113,17 @@ from .const import (
     PESO_APPRENDIMENTO,
     RITENTATIVI,
     SPAZIATURA,
+    STATO_APERTURA,
     STATO_CARICA,
     STATO_COMFORT,
     STATO_DISABILITATO,
     STATO_FUORI,
     STATO_MANUALE,
     STATO_NON_PRONTO,
+    STATO_SENZA_MODULAZIONE,
+    TOLLERANZA_RIPRISTINO,
 )
+from .gestore_aperture import GestoreAperture
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -210,6 +220,31 @@ class ClimaController:
         self._ultimo_conteggio: datetime | None = None
         self._unsub: list[CALLBACK_TYPE] = []
         self._listeners: list[CALLBACK_TYPE] = []
+        # Clima appena ripristinati dopo un'apertura: fino all'ora indicata un
+        # setpoint diverso non e' un comando manuale.
+        self._ignora_manuale: dict[str, datetime] = {}
+
+        # Porte e finestre: solo per i climatizzatori ancora nella zona.
+        aperture = {
+            clima: sensori
+            for clima, sensori in (cfg.get(CONF_APERTURE) or {}).items()
+            if clima in self.climi and sensori
+        }
+        self.aperture: GestoreAperture | None = None
+        if aperture:
+            self.aperture = GestoreAperture(
+                hass, entry.entry_id, self.nome, aperture, cfg,
+                notifica=self.notify, al_ripristino=self._al_ripristino,
+            )
+
+    @property
+    def modulazione(self) -> bool:
+        """La modulazione sul fotovoltaico c'e' solo con il sensore di rete.
+
+        Senza, la zona serve soltanto per le aperture: e' il caso di chi non ha
+        un impianto, e vuole comunque i clima fermi a finestra aperta.
+        """
+        return bool(self.sensore_rete)
 
     # -------------------------------------------------------------------------
     # Ciclo di vita
@@ -244,12 +279,31 @@ class ClimaController:
         for entity_id in self.climi:
             if (valore := self._setpoint_di(entity_id)) is not None:
                 self._comandato[entity_id] = valore
+        if self.aperture is not None:
+            await self.aperture.async_avvia()
         await self._async_ciclo(dt_util.now())
 
     async def async_shutdown(self) -> None:
         for annulla in self._unsub:
             annulla()
         self._unsub.clear()
+        if self.aperture is not None:
+            self.aperture.async_ferma()
+
+    @callback
+    def _al_ripristino(self, entity_id: str, temperatura: float | None) -> None:
+        """Un clima sta per essere riacceso com'era prima dell'apertura.
+
+        Il setpoint che riprende e' nostro, non un comando dell'utente; e per un
+        minuto la macchina puo' riportare quello che ricordava lei prima di
+        prendere il nostro.
+        """
+        if temperatura is not None:
+            try:
+                self._comandato[entity_id] = float(temperatura)
+            except (TypeError, ValueError):
+                pass
+        self._ignora_manuale[entity_id] = dt_util.now() + timedelta(seconds=TOLLERANZA_RIPRISTINO)
 
     @callback
     def async_add_listener(self, update: CALLBACK_TYPE) -> CALLBACK_TYPE:
@@ -328,8 +382,15 @@ class ClimaController:
 
     @property
     def climi_accesi(self) -> list[str]:
+        """I clima accesi e a disposizione della modulazione.
+
+        Uno in pausa per apertura non lo e', anche se gira in ventilazione:
+        non va comandato finche' la pausa non si chiude.
+        """
         accesi = []
         for entity_id in self.climi:
+            if self.aperture is not None and self.aperture.in_pausa(entity_id):
+                continue
             stato = self.hass.states.get(entity_id)
             if stato is not None and stato.state not in INDISPONIBILI and stato.state != STATE_OFF:
                 accesi.append(entity_id)
@@ -410,8 +471,19 @@ class ClimaController:
         """
         adesso = adesso or dt_util.now()
 
+        pausati = self.aperture.pausati() if self.aperture is not None else []
+        if pausati and not self.climi_accesi:
+            nomi = ", ".join(self._nome_clima(e) for e in pausati)
+            return Decisione(STATO_APERTURA, f"in pausa per porta o finestra aperta: {nomi}")
+
+        if not self.modulazione:
+            return Decisione(
+                STATO_SENZA_MODULAZIONE,
+                "modulazione solare non configurata: si gestiscono solo le aperture",
+            )
+
         if not self.abilitato:
-            return Decisione(STATO_DISABILITATO, "zona disabilitata")
+            return Decisione(STATO_DISABILITATO, "modulazione solare disattivata")
 
         if self._manuale_fino is not None and adesso < self._manuale_fino:
             resta = int((self._manuale_fino - adesso).total_seconds() // 60)
@@ -502,6 +574,12 @@ class ClimaController:
 
         obiettivo = round(obiettivo)
         return Decisione(finestra, motivo, setpoint=float(obiettivo), ventola=self._ventola_per(surplus))
+
+    def _nome_clima(self, entity_id: str) -> str:
+        stato = self.hass.states.get(entity_id)
+        if stato is not None and stato.attributes.get("friendly_name"):
+            return str(stato.attributes["friendly_name"])
+        return entity_id
 
     def _limite_accoppiate(self) -> float | None:
         """Non piu' di un grado sotto le zone che condividono il volume.
@@ -658,6 +736,14 @@ class ClimaController:
         atteso = self._comandato.get(entity_id)
         if atteso is not None and abs(valore - atteso) < 0.5:
             return
+
+        if (fino := self._ignora_manuale.get(entity_id)) is not None:
+            if dt_util.now() < fino:
+                # Riacceso da noi dopo un'apertura: e' la macchina che riporta
+                # il valore che ricordava, non l'utente.
+                self._comandato[entity_id] = valore
+                return
+            del self._ignora_manuale[entity_id]
 
         self._comandato[entity_id] = valore
         if self.pausa_manuale > 0:
